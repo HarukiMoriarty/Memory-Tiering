@@ -1,0 +1,4 @@
+.vscode/*
+*.o
+test1.c
+server
