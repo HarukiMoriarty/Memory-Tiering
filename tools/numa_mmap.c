@@ -8,6 +8,7 @@
 #include <linux/mempolicy.h>
 #include <sys/syscall.h>
 #include <errno.h>
+#include <emmintrin.h>
 
 #define PAGE_SIZE 4096 // Assuming 4KB page size
 #define ITERATIONS 100 // Number of runs
@@ -17,6 +18,11 @@ uint64_t get_time_ns() {
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
     return ts.tv_sec * 1000000000ULL + ts.tv_nsec;
+}
+
+// Flush cache line
+void flush_cache(void* addr) {
+    _mm_clflush(addr);
 }
 
 // Allocate memory using mmap
@@ -43,6 +49,7 @@ void move_page_to_node(void* addr, int target_node) {
 
 // Access the memory and measure the time taken
 uint64_t access_page(void* addr) {
+    flush_cache(addr);
     volatile uint64_t* page = (volatile uint64_t*)addr;
     uint64_t start_time = get_time_ns();
 
