@@ -2,14 +2,15 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
-#include <string.h>
 #include <sys/mman.h>
-#include <numaif.h>
 #include <unistd.h>
 #include <time.h>
+#include <linux/mempolicy.h>
+#include <sys/syscall.h>
+#include <errno.h>
 
-#define ITERATIONS 1000000
-#define ARRAY_SIZE 1024 * 1024 // 1MB
+#define PAGE_SIZE 4096 // Assuming 4KB page size
+#define ITERATIONS 100 // Number of runs
 
 // Function to get the current timestamp in nanoseconds
 uint64_t get_time_ns() {
@@ -18,92 +19,86 @@ uint64_t get_time_ns() {
     return ts.tv_sec * 1000000000ULL + ts.tv_nsec;
 }
 
-// Measure memory access latency for a given memory region
-void measure_latency(const char *name, void *array, size_t size) {
-    uint64_t start, end;
-    uint64_t total_latency = 0;
-    volatile int dummy;
-
-    for (size_t i = 0; i < ITERATIONS; ++i) {
-        size_t index = rand() % size; // Random index access
-        start = get_time_ns();
-        dummy = ((int *)array)[index]; // Read access
-        end = get_time_ns();
-        total_latency += (end - start);
+// Allocate memory using mmap
+void* allocate_page() {
+    void* mem = mmap(NULL, PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_POPULATE, -1, 0);
+    if (mem == MAP_FAILED) {
+        perror("mmap failed");
+        exit(EXIT_FAILURE);
     }
-
-    double avg_latency = (double)total_latency / ITERATIONS;
-    printf("Average latency for %s: %.2f ns\n", name, avg_latency);
+    return mem;
 }
 
-void bind_memory_to_numa_node(void *addr, size_t size, int numa_node) {
-    unsigned long nodemask = (1UL << numa_node); // Nodemask for the target NUMA node
-    if (mbind(addr, size, MPOL_BIND, &nodemask, sizeof(nodemask) * 8, 0) != 0) {
-        perror("mbind");
-        munmap(addr, size);
+// Move a single page to another NUMA node
+void move_page_to_node(void* addr, int target_node) {
+    void* pages[1] = { addr };
+    int nodes[1] = { target_node };
+    int status[1];
+
+    if (syscall(SYS_move_pages, 0, 1, pages, nodes, status, MPOL_MF_MOVE) != 0) {
+        perror("move_pages failed");
         exit(EXIT_FAILURE);
     }
 }
 
-void benchmark_memory_access(void *addr, size_t size, const char *description) {
-    volatile int dummy;
-    struct timespec start, end;
+// Access the memory and measure the time taken
+uint64_t access_page(void* addr) {
+    volatile uint64_t* page = (volatile uint64_t*)addr;
+    uint64_t start_time = get_time_ns();
 
-    size_t num_elements = size / sizeof(int); // Total number of integers in the allocated block
+    // Perform a simple read/write operation
+    *page = 44;          // Write to the page
+    volatile uint64_t value = *page; // Read from the page
 
-    // Start timer
-    clock_gettime(CLOCK_MONOTONIC, &start);
-
-    for (int i = 0; i < ITERATIONS; i++) {
-        size_t random_index = rand() % num_elements; // Generate a random index
-        dummy = ((int *)addr)[random_index];        // Access the random index
-    }
-
-    // End timer
-    clock_gettime(CLOCK_MONOTONIC, &end);
-
-    double total_time = (end.tv_sec - start.tv_sec) + (end.tv_nsec - start.tv_nsec) / 1e9;
-    double avg_latency = (total_time / ITERATIONS) * 1e6; // Average latency in microseconds
-
-    printf("Average latency for %s: %.6f µs\n", description, avg_latency);
+    (void)value; // Prevent unused variable warning
+    return get_time_ns() - start_time;
 }
 
 int main() {
-    size_t size = ARRAY_SIZE; // 1 MB
-    void *addr_node0, *addr_node1;
+    printf("NUMA Page Allocation, Migration, and Access Benchmark\n");
 
-    // Allocate memory for NUMA node 0
-    addr_node0 = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-    if (addr_node0 == MAP_FAILED) {
-        perror("mmap (node 0)");
-        exit(EXIT_FAILURE);
+    uint64_t total_alloc_time = 0;
+    uint64_t total_local_access_time = 0;
+    uint64_t total_move_time = 0;
+    uint64_t total_remote_access_time = 0;
+
+    for (int i = 0; i < ITERATIONS; ++i) {
+        // Step 1: Allocate a page and measure the allocation time
+        uint64_t start_time = get_time_ns();
+        void* page = allocate_page();
+        uint64_t alloc_time = get_time_ns() - start_time;
+
+        // Step 2: Access the page locally and measure the access time
+        uint64_t local_access_time = access_page(page);
+
+        // Step 3: Move the page to another NUMA node and measure the migration time
+        start_time = get_time_ns();
+        move_page_to_node(page, 1); // Move to NUMA node 1
+        uint64_t move_time = get_time_ns() - start_time;
+
+        // Step 4: Access the page on the remote NUMA node and measure the access time
+        uint64_t remote_access_time = access_page(page);
+
+        // Cleanup
+        munmap(page, PAGE_SIZE);
+
+        // Accumulate times
+        total_alloc_time += alloc_time;
+        total_local_access_time += local_access_time;
+        total_move_time += move_time;
+        total_remote_access_time += remote_access_time;
     }
-    bind_memory_to_numa_node(addr_node0, size, 0);
-    printf("Memory allocated on NUMA node 0\n");
 
-    // Allocate memory for NUMA node 1
-    addr_node1 = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-    if (addr_node1 == MAP_FAILED) {
-        perror("mmap (node 1)");
-        munmap(addr_node0, size);
-        exit(EXIT_FAILURE);
-    }
-    bind_memory_to_numa_node(addr_node1, size, 1);
-    printf("Memory allocated on NUMA node 1\n");
+    // Calculate and print the averages
+    double avg_alloc_time = (double)total_alloc_time / ITERATIONS;
+    double avg_local_access_time = (double)total_local_access_time / ITERATIONS;
+    double avg_move_time = (double)total_move_time / ITERATIONS;
+    double avg_remote_access_time = (double)total_remote_access_time / ITERATIONS;
 
-    // Write to memory to ensure allocation
-    memset(addr_node0, 0, size);
-    memset(addr_node1, 0, size);
-
-    // Benchmark memory access
-    // measure_latency("NUMA node 0", addr_node0, size);
-    // measure_latency("NUMA node 1", addr_node1, size);
-    benchmark_memory_access(addr_node0, size, "NUMA node 0");
-    benchmark_memory_access(addr_node1, size, "NUMA node 1");
-
-    // Clean up
-    munmap(addr_node0, size);
-    munmap(addr_node1, size);
+    printf("Average time to allocate a page on local NUMA node: %.2f ns\n", avg_alloc_time);
+    printf("Average time to access a page on local NUMA node: %.2f ns\n", avg_local_access_time);
+    printf("Average time to move a page to another NUMA node: %.2f ns\n", avg_move_time);
+    printf("Average time to access a page on remote NUMA node: %.2f ns\n", avg_remote_access_time);
 
     return 0;
 }
