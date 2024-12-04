@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <sys/mman.h>
+#include <fcntl.h>
 #include <unistd.h>
 #include <time.h>
 #include <linux/mempolicy.h>
@@ -12,6 +13,7 @@
 
 #define PAGE_SIZE 4096 // Assuming 4KB page size
 #define ITERATIONS 100 // Number of runs
+#define PMEM_FILE "/mnt/pmem-aos/latency_test"
 
 // Function to get the current timestamp in nanoseconds
 uint64_t get_time_ns() {
@@ -30,6 +32,16 @@ void* allocate_page() {
     void* mem = mmap(NULL, PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_POPULATE, -1, 0);
     if (mem == MAP_FAILED) {
         perror("mmap failed");
+        exit(EXIT_FAILURE);
+    }
+    return mem;
+}
+
+// Allocate memory on PMEM using mmap
+void* allocate_pmem_page(int fd, size_t size) {
+    void* mem = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_POPULATE, fd, 0);
+    if (mem == MAP_FAILED) {
+        perror("mmap PMEM failed");
         exit(EXIT_FAILURE);
     }
     return mem;
@@ -62,50 +74,86 @@ uint64_t access_page(void* addr) {
 }
 
 int main() {
-    printf("NUMA Page Allocation, Migration, and Access Benchmark\n");
+    printf("NUMA and PMEM Page Allocation, Migration, and Access Benchmark\n");
+
+    // Create and prepare the PMEM file
+    int fd = open(PMEM_FILE, O_RDWR | O_CREAT | O_DIRECT, 0666);
+    if (fd < 0) {
+        perror("open PMEM file failed");
+        return 1;
+    }
+
+    // Resize the PMEM file to fit PAGE_SIZE
+    if (ftruncate(fd, PAGE_SIZE) != 0) {
+        perror("ftruncate PMEM file failed");
+        close(fd);
+        return 1;
+    }
 
     uint64_t total_alloc_time = 0;
     uint64_t total_local_access_time = 0;
     uint64_t total_move_time = 0;
     uint64_t total_remote_access_time = 0;
 
+    uint64_t total_pmem_alloc_time = 0;
+    uint64_t total_pmem_access_time = 0;
+
     for (int i = 0; i < ITERATIONS; ++i) {
-        // Step 1: Allocate a page and measure the allocation time
+        // Step 1: Allocate a DRAM page and measure the allocation time
         uint64_t start_time = get_time_ns();
-        void* page = allocate_page();
+        void* dram_page = allocate_page();
         uint64_t alloc_time = get_time_ns() - start_time;
 
-        // Step 2: Access the page locally and measure the access time
-        uint64_t local_access_time = access_page(page);
+        // Step 2: Access the DRAM page locally and measure the access time
+        uint64_t local_access_time = access_page(dram_page);
 
-        // Step 3: Move the page to another NUMA node and measure the migration time
+        // Step 3: Move the DRAM page to another NUMA node and measure the migration time
         start_time = get_time_ns();
-        move_page_to_node(page, 1); // Move to NUMA node 1
+        move_page_to_node(dram_page, 1); // Move to NUMA node 1
         uint64_t move_time = get_time_ns() - start_time;
 
-        // Step 4: Access the page on the remote NUMA node and measure the access time
-        uint64_t remote_access_time = access_page(page);
+        // Step 4: Access the DRAM page on the remote NUMA node and measure the access time
+        uint64_t remote_access_time = access_page(dram_page);
 
-        // Cleanup
-        munmap(page, PAGE_SIZE);
+        // Cleanup DRAM page
+        munmap(dram_page, PAGE_SIZE);
+
+        // Step 5: Allocate a PMEM page and measure the allocation time
+        start_time = get_time_ns();
+        void* pmem_page = allocate_pmem_page(fd, PAGE_SIZE);
+        uint64_t pmem_alloc_time = get_time_ns() - start_time;
+
+        // Step 6: Access the PMEM page and measure the access time
+        uint64_t pmem_access_time = access_page(pmem_page);
+
+        // Cleanup PMEM page
+        munmap(pmem_page, PAGE_SIZE);
 
         // Accumulate times
         total_alloc_time += alloc_time;
         total_local_access_time += local_access_time;
         total_move_time += move_time;
         total_remote_access_time += remote_access_time;
+        total_pmem_alloc_time += pmem_alloc_time;
+        total_pmem_access_time += pmem_access_time;
     }
+
+    close(fd);
 
     // Calculate and print the averages
     double avg_alloc_time = (double)total_alloc_time / ITERATIONS;
     double avg_local_access_time = (double)total_local_access_time / ITERATIONS;
     double avg_move_time = (double)total_move_time / ITERATIONS;
     double avg_remote_access_time = (double)total_remote_access_time / ITERATIONS;
+    double avg_pmem_alloc_time = (double)total_pmem_alloc_time / ITERATIONS;
+    double avg_pmem_access_time = (double)total_pmem_access_time / ITERATIONS;
 
-    printf("Average time to allocate a page on local NUMA node: %.2f ns\n", avg_alloc_time);
-    printf("Average time to access a page on local NUMA node: %.2f ns\n", avg_local_access_time);
-    printf("Average time to move a page to another NUMA node: %.2f ns\n", avg_move_time);
-    printf("Average time to access a page on remote NUMA node: %.2f ns\n", avg_remote_access_time);
+    printf("Average time to allocate a DRAM page: %.2f ns\n", avg_alloc_time);
+    printf("Average time to access a DRAM page locally: %.2f ns\n", avg_local_access_time);
+    printf("Average time to move a DRAM page to another NUMA node: %.2f ns\n", avg_move_time);
+    printf("Average time to access a DRAM page on a remote NUMA node: %.2f ns\n", avg_remote_access_time);
+    printf("Average time to allocate a PMEM page: %.2f ns\n", avg_pmem_alloc_time);
+    printf("Average time to access a PMEM page: %.2f ns\n", avg_pmem_access_time);
 
     return 0;
 }
