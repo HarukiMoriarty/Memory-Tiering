@@ -63,14 +63,20 @@ void move_page_to_node(void* addr, int target_node) {
 uint64_t access_page(void* addr) {
     flush_cache(addr);
     volatile uint64_t* page = (volatile uint64_t*)addr;
+    // random offset
+    size_t offset = rand() % (PAGE_SIZE / sizeof(uint64_t));
     uint64_t start_time = get_time_ns();
+    uint64_t duration = 0;
 
     // Perform a simple read/write operation
-    *page = 44;          // Write to the page
-    volatile uint64_t value = *page; // Read from the page
+    // *page = 44;          // Write to the page
+    page[offset] = 44;    // Write to a random offset
+    // volatile uint64_t value = *page; // Read from the page
+    // volatile uint64_t value = page[offset]; // Read from a random offset
 
-    (void)value; // Prevent unused variable warning
-    return get_time_ns() - start_time;
+    duration = get_time_ns() - start_time;
+    // (void)value; // Prevent unused variable warning
+    return duration;
 }
 
 int main() {
