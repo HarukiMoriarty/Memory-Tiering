@@ -11,11 +11,11 @@
 #include <errno.h>
 #include <emmintrin.h>
 
-#define PAGE_SIZE 4096 // Assuming 4KB page size
-#define ITERATIONS 100 // Number of runs
+#define PAGE_SIZE 4096
+#define ITERATIONS 1000 
 #define PMEM_FILE "/mnt/pmem-aos/latency_test"
-#define DAX_DEVICE "/dev/dax1.0"  // Adjust to your device
-#define MAP_SIZE 2097152          // Must be aligned to the device's alignment
+#define DAX_DEVICE "/dev/dax1.0"  
+#define MAP_SIZE 2097152       
 
 // Function to get the current timestamp in nanoseconds
 uint64_t get_time_ns() {
@@ -65,20 +65,13 @@ void move_page_to_node(void* addr, int target_node) {
 uint64_t access_page(void* addr) {
     flush_cache(addr);
     volatile uint64_t* page = (volatile uint64_t*)addr;
-    // random offset
-    size_t offset = rand() % (PAGE_SIZE / sizeof(uint64_t));
     uint64_t start_time = get_time_ns();
-    uint64_t duration = 0;
 
     // Perform a simple read/write operation
-    // *page = 44;          // Write to the page
-    page[offset] = 44;    // Write to a random offset
-    // volatile uint64_t value = *page; // Read from the page
-    // volatile uint64_t value = page[offset]; // Read from a random offset
+    *page = 44;     // Write to a random offset
+    volatile uint64_t value = *page; // Read from the page
 
-    duration = get_time_ns() - start_time;
-    // (void)value; // Prevent unused variable warning
-    return duration;
+    return get_time_ns() - start_time;
 }
 
 int main() {
@@ -99,14 +92,14 @@ int main() {
     }
 
     // Access PMEM via devdax
-    int dax_fd = open(DAX_DEVICE, O_RDWR | O_DIRECT);
-    if (fd < 0) {
-        perror("open failed");
+    int dax_fd = open(DAX_DEVICE, O_RDWR);
+    if (dax_fd < 0) {
+        perror("open failed asd");
         return 1;
     }
 
     // Map the device into memory
-    void *mapped_addr = allocate_pmem_page(dax_fd, MAP_SIZE);
+    void* mapped_addr = allocate_pmem_page(dax_fd, MAP_SIZE);
 
     uint64_t total_alloc_time = 0;
     uint64_t total_local_access_time = 0;
@@ -151,7 +144,7 @@ int main() {
 
         // Step 7: Allocate a PMEM range via devdax and measure the allocation time
         start_time = get_time_ns();
-        void* pmem_devdax_range = allocate_pmem_page(dax_fd, MAP_SIZE);
+        void* pmem_devdax_range = allocate_pmem_page(dax_fd, PAGE_SIZE);
         uint64_t pmem_devdax_alloc_time = get_time_ns() - start_time;
 
         // Step 8: Access the PMEM range via devdax and measure the access time

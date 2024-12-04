@@ -2,3 +2,5 @@
 *.o
 test1.c
 server
+numa*
+pmem*
