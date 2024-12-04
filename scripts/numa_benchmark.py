@@ -16,6 +16,8 @@ patterns = {
     "access_dram_remote": re.compile(r"Average time to access a DRAM page on a remote NUMA node:\s+([\d.]+) ns"),
     "allocate_pmem_page": re.compile(r"Average time to allocate a PMEM page:\s+([\d.]+) ns"),
     "access_pmem_page": re.compile(r"Average time to access a PMEM page:\s+([\d.]+) ns"),
+    "allocate_pmem_devdax_page": re.compile(r"Average time to allocate a PMEM range via devdax:\s+([\d.]+) ns"),
+    "access_pmem_devdax_page": re.compile(r"Average time to access a PMEM range via devdax:\s+([\d.]+) ns"),
 }
 
 # Store the results for each metric
