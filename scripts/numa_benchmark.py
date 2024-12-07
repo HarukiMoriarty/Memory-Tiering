@@ -3,7 +3,7 @@ import re
 import statistics
 
 # Define the command to run the benchmark
-command = ["sudo", "numactl", "--membind=0", "--cpubind=0", "../tools/numa_mmap"]
+command = ["sudo", "numactl", "--membind=0", "--cpubind=0", "../tools/benchmark"]
 
 # Number of iterations for the batch
 num_iterations = 50
