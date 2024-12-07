@@ -4,7 +4,7 @@ CFLAGS = -Wall -O2 -lrt
 NUMA_LIB = -lnuma
 
 # Targets
-TARGETS = pmem numa numa_mmap
+TARGETS = pmem numa numa_mmap benchmark
 
 # Build rules
 all: $(TARGETS)
@@ -16,6 +16,9 @@ numa: numa.c
 	$(CC) $(CFLAGS) -o $@ $^ $(NUMA_LIB)
 
 numa_mmap: numa_mmap.c
+	$(CC) $(CFLAGS) -o $@ $^ $(NUMA_LIB)
+
+benchmark: benchmark.c
 	$(CC) $(CFLAGS) -o $@ $^ $(NUMA_LIB)
 
 # Clean rule
