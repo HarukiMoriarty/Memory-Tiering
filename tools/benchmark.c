@@ -13,10 +13,12 @@
 
 #define PAGE_SIZE 4096
 #define PAGE_NUM 100
-#define ITERATIONS 1000 
+#define ITERATIONS 10000 
 #define PMEM_FILE "/mnt/pmem-aos/latency_test"
 #define DAX_DEVICE "/dev/dax1.0"  
 #define MAP_SIZE 2097152       
+
+int page_access_track[PAGE_NUM] = {0};
 
 // Function to get the current timestamp in nanoseconds
 uint64_t get_time_ns() {
@@ -112,9 +114,28 @@ uint64_t access_random_page(void* addr, size_t page_num) {
     int offset = random_page * PAGE_SIZE / sizeof(uint64_t);
     // Perform a simple read/write operation
     page[offset] = 44;     // Write to a random page
-    volatile uint64_t value = page[offset]; // Read from the page
+    // volatile uint64_t value = page[offset]; // Read from the page
+
+#ifdef DEBUG
+    page_access_track[random_page]++;
+#endif
 
     return get_time_ns() - start_time;
+}
+
+void print_page_access_track() {
+    // print in a more compact way (10 per line)
+    for (int i = 0; i < PAGE_NUM; i++) {
+        if (i % 10 == 0) {
+            printf("\n");
+        }
+        printf("%d ", page_access_track[i]);
+    }
+    printf("\n");
+    // clear the page access track
+    for (int i = 0; i < PAGE_NUM; i++) {
+        page_access_track[i] = 0;
+    }
 }
 
 int main() {
@@ -164,6 +185,10 @@ int main() {
     for (int i = 0; i < ITERATIONS; ++i) {
         total_local_access_time += access_random_page(dram_page, PAGE_NUM);
     }
+
+#ifdef DEBUG
+    print_page_access_track();
+#endif
 
     // Step 3: Move the DRAM page to another NUMA node and measure the migration time
     start_time = get_time_ns();

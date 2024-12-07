@@ -3,6 +3,10 @@ CC = gcc
 CFLAGS = -Wall -O2 -lrt
 NUMA_LIB = -lnuma
 
+ifdef DEBUG
+CFLAGS += -DDEBUG
+endif
+
 # Targets
 TARGETS = pmem numa numa_mmap benchmark
 
