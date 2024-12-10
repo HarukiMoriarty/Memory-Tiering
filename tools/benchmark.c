@@ -10,9 +10,10 @@
 #include <sys/syscall.h>
 #include <errno.h>
 #include <emmintrin.h>
+#include <string.h>
 
 #define PAGE_SIZE 4096
-#define PAGE_NUM 100
+#define PAGE_NUM 10000
 #define ITERATIONS 10000 
 #define PMEM_FILE "/mnt/pmem-aos/latency_test"
 #define DAX_DEVICE "/dev/dax1.0"  
@@ -143,6 +144,46 @@ uint64_t access_random_page(void* addr, size_t page_num, mem_access_mode mode) {
     return get_time_ns() - start_time;
 }
 
+// Access the random memory and measure the time taken
+uint64_t access_random_page_pmem(void* addr, size_t page_num, mem_access_mode mode) {
+    int offset_count = 1000;
+    int* offsets = (int*)malloc(offset_count * sizeof(int));
+    for (size_t i = 0; i < offset_count; i++) {
+        offsets[i] = (rand() % page_num) * PAGE_SIZE / sizeof(uint64_t);
+    };
+    flush_cache(addr);
+    volatile uint64_t* page = (volatile uint64_t*)addr;
+    uint64_t start_time = get_time_ns();
+    // Perform a simple read/write operation
+    for (size_t i = 0; i < offset_count; i++) {
+        int offset = offsets[i];
+        volatile uint64_t value;
+        switch (mode) {
+        case READ:
+            value = page[offset]; // Read from the page
+            break;
+        case WRITE:
+            page[offset] = 44;    // Write to the page
+            break;
+        case READ_WRITE:
+            // currently only try read
+            // value = 44;
+            // memcpy((void*)&page[offset], &value, sizeof(uint64_t));
+            uint64_t value_2;
+            memcpy(&value_2, (const void*)&page[offset], sizeof(uint64_t));
+            break;
+        default:
+            break;
+        }
+    }
+
+#ifdef DEBUG
+    page_access_track[random_page]++;
+#endif
+
+    return (get_time_ns() - start_time)/offset_count;
+}
+
 void print_page_access_track() {
     // print in a more compact way (10 per line)
     for (int i = 0; i < PAGE_NUM; i++) {
@@ -232,7 +273,7 @@ int main() {
 
     // Step 6: Access the PMEM page and measure the access time
     for (int i = 0; i < ITERATIONS; ++i) {
-        total_pmem_access_time += access_random_page(pmem_page, PAGE_NUM, READ_WRITE);
+        total_pmem_access_time += access_random_page_pmem(pmem_page, PAGE_NUM, READ_WRITE);
     }
 
     // Cleanup PMEM page
@@ -246,7 +287,7 @@ int main() {
 
     // Step 8: Access the PMEM range via devdax and measure the access time
     for (int i = 0; i < ITERATIONS; ++i) {
-        total_pmem_devdax_access_time += access_random_page(pmem_devdax_range, PAGE_NUM, READ_WRITE);
+        total_pmem_devdax_access_time += access_random_page_pmem(pmem_devdax_range, PAGE_NUM, READ_WRITE);
     }
 
     close(fd);
