@@ -13,7 +13,7 @@
 #include <string.h>
 
 #define PAGE_SIZE 4096
-#define PAGE_NUM 10000
+#define PAGE_NUM 100000
 #define ITERATIONS 10000 
 #define PMEM_FILE "/mnt/pmem1-aos/latency_test"
 // #define DAX_DEVICE "/dev/dax1.0"  
@@ -51,7 +51,7 @@ void* allocate_pages(size_t size, size_t number) {
 
 // Allocate memory on PMEM using mmap (total PAGE_NUM pages)
 void* allocate_pmem_pages(int fd, size_t size, size_t number) {
-    void* mem = mmap(NULL, size * number, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_POPULATE, fd, 0);
+    void* mem = mmap(NULL, size * number, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_POPULATE, fd, 0);
     if (mem == MAP_FAILED) {
         perror("mmap PMEM failed");
         exit(EXIT_FAILURE);
@@ -146,21 +146,22 @@ uint64_t access_random_page(void* addr, size_t page_num, mem_access_mode mode) {
 
 // Access the random memory and measure the time taken
 uint64_t access_random_page_pmem(void* addr, size_t page_num, mem_access_mode mode) {
-    int offset_count = 1000;
+    int offset_count = 100;
     int* offsets = (int*)malloc(offset_count * sizeof(int));
     for (size_t i = 0; i < offset_count; i++) {
         offsets[i] = (rand() % page_num) * PAGE_SIZE / sizeof(uint64_t);
     };
-    flush_cache(addr);
     volatile uint64_t* page = (volatile uint64_t*)addr;
     uint64_t start_time = get_time_ns();
     // Perform a simple read/write operation
     for (size_t i = 0; i < offset_count; i++) {
+        flush_cache(addr);
         int offset = offsets[i];
         volatile uint64_t value;
         switch (mode) {
         case READ:
             value = page[offset]; // Read from the page
+            // printf("value: %ld\n", value);
             break;
         case WRITE:
             page[offset] = 44;    // Write to the page
@@ -171,6 +172,7 @@ uint64_t access_random_page_pmem(void* addr, size_t page_num, mem_access_mode mo
             // memcpy((void*)&page[offset], &value, sizeof(uint64_t));
             uint64_t value_2;
             memcpy(&value_2, (const void*)&page[offset], sizeof(uint64_t));
+            // printf("value: %ld\n", value_2);
             break;
         default:
             break;
@@ -206,18 +208,18 @@ int main() {
     srand(time(NULL));
 
     // Create and prepare the PMEM file
-    int fd = open(PMEM_FILE, O_RDWR | O_CREAT | O_DIRECT, 0666);
+    int fd = open(PMEM_FILE, O_RDWR, 0666);
     if (fd < 0) {
         perror("open PMEM file failed");
         return 1;
     }
 
     // Resize the PMEM file to fit PAGE_SIZE
-    if (ftruncate(fd, PAGE_SIZE * PAGE_NUM) != 0) {
-        perror("ftruncate PMEM file failed");
-        close(fd);
-        return 1;
-    }
+    // if (ftruncate(fd, PAGE_SIZE * PAGE_NUM) != 0) {
+    //     perror("ftruncate PMEM file failed");
+    //     close(fd);
+    //     return 1;
+    // }
 
     // Access PMEM via devdax
     // int dax_fd = open(DAX_DEVICE, O_RDWR);
@@ -273,7 +275,7 @@ int main() {
 
     // Step 6: Access the PMEM page and measure the access time
     for (int i = 0; i < ITERATIONS; ++i) {
-        total_pmem_access_time += access_random_page(pmem_page, PAGE_NUM, READ_WRITE);
+        total_pmem_access_time += access_random_page_pmem(pmem_page, PAGE_NUM, READ);
     }
 
     // Cleanup PMEM page
