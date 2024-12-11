@@ -15,8 +15,8 @@
 #define PAGE_SIZE 4096
 #define PAGE_NUM 10000
 #define ITERATIONS 10000 
-#define PMEM_FILE "/mnt/pmem-aos/latency_test"
-#define DAX_DEVICE "/dev/dax1.0"  
+#define PMEM_FILE "/mnt/pmem1-aos/latency_test"
+// #define DAX_DEVICE "/dev/dax1.0"  
 #define MAP_SIZE 2097152       
 
 int page_access_track[PAGE_NUM] = {0};
@@ -220,11 +220,11 @@ int main() {
     }
 
     // Access PMEM via devdax
-    int dax_fd = open(DAX_DEVICE, O_RDWR);
-    if (dax_fd < 0) {
-        perror("open failed asd");
-        return 1;
-    }
+    // int dax_fd = open(DAX_DEVICE, O_RDWR);
+    // if (dax_fd < 0) {
+    //     perror("open failed asd");
+    //     return 1;
+    // }
 
     uint64_t total_alloc_time = 0;
     uint64_t total_local_access_time = 0;
@@ -233,8 +233,8 @@ int main() {
 
     uint64_t total_pmem_alloc_time = 0;
     uint64_t total_pmem_access_time = 0;
-    uint64_t total_pmem_devdax_alloc_time = 0;
-    uint64_t total_pmem_devdax_access_time = 0;
+    // uint64_t total_pmem_devdax_alloc_time = 0;
+    // uint64_t total_pmem_devdax_access_time = 0;
 
     // Step 1: Allocate a DRAM page and measure the allocation time
     uint64_t start_time = get_time_ns();
@@ -273,22 +273,22 @@ int main() {
 
     // Step 6: Access the PMEM page and measure the access time
     for (int i = 0; i < ITERATIONS; ++i) {
-        total_pmem_access_time += access_random_page_pmem(pmem_page, PAGE_NUM, READ_WRITE);
+        total_pmem_access_time += access_random_page(pmem_page, PAGE_NUM, READ_WRITE);
     }
 
     // Cleanup PMEM page
     munmap(pmem_page, PAGE_SIZE);
 
     // Step 7: Allocate a PMEM range via devdax and measure the allocation time
-    start_time = get_time_ns();
-    void* pmem_devdax_range = allocate_pmem_pages(dax_fd, PAGE_SIZE, PAGE_NUM);
-    uint64_t pmem_devdax_alloc_time = get_time_ns() - start_time;
-    total_pmem_devdax_alloc_time += pmem_devdax_alloc_time;
+    // start_time = get_time_ns();
+    // void* pmem_devdax_range = allocate_pmem_pages(dax_fd, PAGE_SIZE, PAGE_NUM);
+    // uint64_t pmem_devdax_alloc_time = get_time_ns() - start_time;
+    // total_pmem_devdax_alloc_time += pmem_devdax_alloc_time;
 
-    // Step 8: Access the PMEM range via devdax and measure the access time
-    for (int i = 0; i < ITERATIONS; ++i) {
-        total_pmem_devdax_access_time += access_random_page_pmem(pmem_devdax_range, PAGE_NUM, READ_WRITE);
-    }
+    // // Step 8: Access the PMEM range via devdax and measure the access time
+    // for (int i = 0; i < ITERATIONS; ++i) {
+    //     total_pmem_devdax_access_time += access_random_page_pmem(pmem_devdax_range, PAGE_NUM, READ_WRITE);
+    // }
 
     close(fd);
 
@@ -299,8 +299,8 @@ int main() {
     double avg_remote_access_time = (double)total_remote_access_time / ITERATIONS;
     double avg_pmem_alloc_time = (double)total_pmem_alloc_time;
     double avg_pmem_access_time = (double)total_pmem_access_time / ITERATIONS;
-    double avg_pmem_devdax_alloc_time = (double)total_pmem_devdax_alloc_time;
-    double avg_pmem_devdax_access_time = (double)total_pmem_devdax_access_time / ITERATIONS;
+    // double avg_pmem_devdax_alloc_time = (double)total_pmem_devdax_alloc_time;
+    // double avg_pmem_devdax_access_time = (double)total_pmem_devdax_access_time / ITERATIONS;
 
     printf("Average time to allocate a DRAM page: %.2f ns\n", avg_alloc_time);
     printf("Average time to access a DRAM page locally: %.2f ns\n", avg_local_access_time);
@@ -308,8 +308,8 @@ int main() {
     printf("Average time to access a DRAM page on a remote NUMA node: %.2f ns\n", avg_remote_access_time);
     printf("Average time to allocate a PMEM page: %.2f ns\n", avg_pmem_alloc_time);
     printf("Average time to access a PMEM page: %.2f ns\n", avg_pmem_access_time);
-    printf("Average time to allocate a PMEM range via devdax: %.2f ns\n", avg_pmem_devdax_alloc_time);
-    printf("Average time to access a PMEM range via devdax: %.2f ns\n", avg_pmem_devdax_access_time);
+    // printf("Average time to allocate a PMEM range via devdax: %.2f ns\n", avg_pmem_devdax_alloc_time);
+    // printf("Average time to access a PMEM range via devdax: %.2f ns\n", avg_pmem_devdax_access_time);
 
     return 0;
 }
