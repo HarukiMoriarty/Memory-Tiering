@@ -4,15 +4,15 @@
 #include <string>
 
 #include "RingBuffer.hpp"
-#include "Common.h"
+#include "Common.hpp"
 
 class Server {
 public:
-    Server(RingBuffer<Message>& buffer, const std::vector<int>& client_memory_spaces);
+    Server(RingBuffer<Message>& client_buffer, const std::vector<int>& client_memory_spaces);
     void run();
 
 private:
-    RingBuffer<Message>& buffer_;
+    RingBuffer<Message>& client_buffer_;
     std::vector<int> base_addresses_;
 };
 

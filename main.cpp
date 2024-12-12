@@ -4,7 +4,7 @@
 #include "Server.hpp"
 #include "RingBuffer.hpp"
 #include "ConfigParser.hpp"
-#include "Common.h"
+#include "Common.hpp"
 
 int main(int argc, char* argv[]) {
     ConfigParser config;

@@ -4,7 +4,7 @@
 #include <string>
 #include <cxxopts.hpp>
 
-#include "Common.h"
+#include "Common.hpp"
 
 class ConfigParser {
 public:

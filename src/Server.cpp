@@ -4,8 +4,8 @@
 #include <boost/chrono.hpp>
 #include <boost/thread/thread.hpp> 
 
-Server::Server(RingBuffer<Message>& buffer, const std::vector<int>& client_memory_sizes)
-    : buffer_(buffer) {
+Server::Server(RingBuffer<Message>& client_buffer, const std::vector<int>& client_memory_sizes)
+    : client_buffer_(client_buffer) {
     // Calculate base addresses for each client
     int current_base = 0;
     for (int size : client_memory_sizes) {
@@ -19,7 +19,7 @@ void Server::run() {
     while (true) {
         Message msg(0, 0, OperationType::READ);
 
-        if (buffer_.pop(msg)) {
+        if (client_buffer_.pop(msg)) {
             std::cout << "Server received: " << msg.toString() << std::endl;
             int actual_address = base_addresses_[msg.client_id] + msg.offset;
 
