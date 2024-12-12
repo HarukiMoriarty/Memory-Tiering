@@ -79,4 +79,20 @@ struct Message {
     }
 };
 
+struct MemMoveReq {
+    int page_id;
+    int layer_id;
+
+    MemMoveReq(int page_id, int layer_id)
+        : page_id(page_id), layer_id(layer_id) {
+    }
+
+    std::string toString() const {
+        std::stringstream ss;
+        ss << "Page " << page_id
+            << " to Layer: " << layer_id;
+        return ss.str();
+    }
+};
+
 #endif // COMMON_H
