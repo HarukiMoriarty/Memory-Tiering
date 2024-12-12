@@ -1,16 +1,18 @@
 #ifndef CLIENT_H
 #define CLIENT_H
 
-#include "RingBuffer.hpp"
 #include <string>
+
+#include "RingBuffer.hpp"
+#include "Common.h"
 
 class Client {
 public:
-    Client(RingBuffer<std::string>& buffer, int message_cnt);
+    Client(RingBuffer<Message>& buffer, int message_cnt);
     void run();
 
 private:
-    RingBuffer<std::string>& buffer_;
+    RingBuffer<Message>& buffer_;
     int message_cnt_;
 };
 

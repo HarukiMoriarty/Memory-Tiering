@@ -4,6 +4,7 @@
 #include "Server.hpp"
 #include "RingBuffer.hpp"
 #include "ConfigParser.hpp"
+#include "Common.h"
 
 int main(int argc, char* argv[]) {
     ConfigParser config;
@@ -12,7 +13,7 @@ int main(int argc, char* argv[]) {
         return config.isHelpRequested() ? 0 : 1;
     }
 
-    RingBuffer<std::string> buffer(config.getBufferSize());
+    RingBuffer<Message> buffer(config.getBufferSize());
     Client client(buffer, config.getMessageCount());
     Server server(buffer);
 
