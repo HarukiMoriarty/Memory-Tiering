@@ -8,12 +8,14 @@
 
 class Client {
 public:
-    Client(RingBuffer<Message>& buffer, int message_cnt);
+    Client(RingBuffer<Message>& buffer, int client_id, int message_cnt, int memory_space, AccessPattern pattern);
     void run();
 
 private:
     RingBuffer<Message>& buffer_;
+    int client_id_;
     int message_cnt_;
+    MemoryAccessGenerator generator_;
 };
 
 #endif // CLIENT_H
