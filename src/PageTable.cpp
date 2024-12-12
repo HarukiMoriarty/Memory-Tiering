@@ -43,3 +43,15 @@ void PageTable::updatePageLayer(size_t index, int new_layer) {
         table_[index].last_access_time = std::chrono::steady_clock::now();
     }
 }
+
+PageMetadata PageTable::scanNext() {
+    boost::unique_lock<boost::shared_mutex> lock(mutex_);
+
+    if (table_.empty()) {
+        return PageMetadata(); // Handle empty table case
+    }
+    // Return the current page and move to the next index (circularly)
+    PageMetadata page = table_[current_index_];
+    current_index_ = (current_index_ + 1) % table_.size(); // Wrap around using modulo
+    return page;
+}

@@ -26,10 +26,12 @@ public:
     void updatePage(size_t index, const PageMetadata& metadata);
     void updateAccessTime(size_t index);
     void updatePageLayer(size_t index, int new_layer);
+    PageMetadata scanNext();
 
 private:
     std::vector<PageMetadata> table_;
     mutable boost::shared_mutex mutex_;
+    size_t current_index_;
 };
 
 #endif // PAGETABLE_H
