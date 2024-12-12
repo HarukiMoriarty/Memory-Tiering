@@ -13,21 +13,22 @@ int main(int argc, char* argv[]) {
         return config.isHelpRequested() ? 0 : 1;
     }
 
-    RingBuffer<Message> buffer(config.getBufferSize());
+    RingBuffer<Message> client_req_buffer(config.getBufferSize());
     std::vector<int> memory_sizes;
     const auto& client_configs = config.getClientConfigs();
     for (const auto& client_config : client_configs) {
         memory_sizes.push_back(client_config.memory_size);
     }
 
-    Server server(buffer, memory_sizes);
+    RingBuffer<MemMoveReq> move_page_buffer(config.getBufferSize());
+    Server server(client_req_buffer, move_page_buffer, memory_sizes);
 
     std::vector<std::shared_ptr<Client>> clients;
     std::vector<boost::thread> client_threads;
     for (size_t i = 0; i < client_configs.size(); i++) {
         const auto& client_config = client_configs[i];
         auto client = std::make_shared<Client>(
-            buffer,
+            client_req_buffer,
             i,
             config.getMessageCount(),
             client_config.memory_size,
@@ -37,7 +38,7 @@ int main(int argc, char* argv[]) {
         client_threads.emplace_back([client]() { client->run(); });
     }
 
-    boost::thread server_thread(&Server::run, &server);
+    boost::thread server_thread(&Server::start, &server);
 
     for (auto& thread : client_threads) {
         thread.join();
