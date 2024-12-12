@@ -1,15 +1,23 @@
+#include <boost/thread/thread.hpp>
+
 #include "Client.hpp"
 #include "Server.hpp"
 #include "RingBuffer.hpp"
-#include <thread>
+#include "ConfigParser.hpp"
 
-int main() {
-    RingBuffer<std::string> buffer(10);
-    Client client(buffer);
+int main(int argc, char* argv[]) {
+    ConfigParser config;
+
+    if (!config.parse(argc, argv)) {
+        return config.isHelpRequested() ? 0 : 1;
+    }
+
+    RingBuffer<std::string> buffer(config.getBufferSize());
+    Client client(buffer, config.getMessageCount());
     Server server(buffer);
 
-    std::thread client_thread(&Client::run, &client);
-    std::thread server_thread(&Server::run, &server);
+    boost::thread client_thread(&Client::run, &client);
+    boost::thread server_thread(&Server::run, &server);
 
     client_thread.join();
     server_thread.join();
