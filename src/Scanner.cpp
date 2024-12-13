@@ -36,7 +36,7 @@ void Scanner::runClassifier(RingBuffer<MemMoveReq>& move_page_buffer, size_t min
             std::cout << "Cold page detected: " << page.page_address << std::endl;
         }
 
-        MemMoveReq msg(page.page_address, 1);
+        MemMoveReq msg(page.page_id, 1);
         while (!move_page_buffer.push(msg)) {
             boost::this_thread::sleep_for(boost::chrono::nanoseconds(100));
         }

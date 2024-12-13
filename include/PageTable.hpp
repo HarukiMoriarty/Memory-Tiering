@@ -9,10 +9,11 @@
 struct PageMetadata {
     void* page_address;
     int page_layer;
+    int page_id;
     std::chrono::steady_clock::time_point last_access_time;
     size_t access_count = 0;
 
-    PageMetadata(void* addr = 0, int layer = 0);
+    PageMetadata(void* addr = 0, int layer = 0, int id = 0);
 };
 
 class PageTable {
