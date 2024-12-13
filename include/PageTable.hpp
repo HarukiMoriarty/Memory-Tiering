@@ -10,6 +10,7 @@ struct PageMetadata {
     int page_address;
     int page_layer;
     std::chrono::steady_clock::time_point last_access_time;
+    size_t access_count = 0;
 
     PageMetadata(int addr = 0, int layer = 0);
 };
@@ -24,9 +25,10 @@ public:
 
     // Write operations  
     void updatePage(size_t index, const PageMetadata& metadata);
-    void updateAccessTime(size_t index);
+    void updateAccess(size_t index);
     void updatePageLayer(size_t index, int new_layer);
     PageMetadata scanNext();
+    void resetAccessCount();
 
 private:
     std::vector<PageMetadata> table_;

@@ -3,7 +3,8 @@
 PageMetadata::PageMetadata(int addr, int layer)
     : page_address(addr),
     page_layer(layer),
-    last_access_time(std::chrono::steady_clock::now())
+    last_access_time(std::chrono::steady_clock::now()),
+    access_count(0),
 {
 }
 
@@ -29,10 +30,11 @@ void PageTable::updatePage(size_t index, const PageMetadata& metadata) {
     }
 }
 
-void PageTable::updateAccessTime(size_t index) {
+void PageTable::updateAccess(size_t index) {
     boost::unique_lock<boost::shared_mutex> lock(mutex_);
     if (index < table_.size()) {
         table_[index].last_access_time = std::chrono::steady_clock::now();
+        table_[index].access_count++;
     }
 }
 
@@ -41,6 +43,7 @@ void PageTable::updatePageLayer(size_t index, int new_layer) {
     if (index < table_.size()) {
         table_[index].page_layer = new_layer;
         table_[index].last_access_time = std::chrono::steady_clock::now();
+        table_[index].access_count++;
     }
 }
 
@@ -54,4 +57,11 @@ PageMetadata PageTable::scanNext() {
     PageMetadata page = table_[current_index_];
     current_index_ = (current_index_ + 1) % table_.size(); // Wrap around using modulo
     return page;
+}
+
+void resetAccessCount() {
+    boost::unique_lock<boost::shared_mutex> lock(mutex_);
+    for (auto& page : table_) {
+        page.access_count = 0; // Reset access count
+    }
 }
