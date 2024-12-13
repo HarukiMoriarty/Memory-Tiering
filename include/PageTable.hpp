@@ -7,12 +7,12 @@
 #include <chrono>
 
 struct PageMetadata {
-    int page_address;
+    void* page_address;
     int page_layer;
     std::chrono::steady_clock::time_point last_access_time;
     size_t access_count = 0;
 
-    PageMetadata(int addr = 0, int layer = 0);
+    PageMetadata(void* addr = 0, int layer = 0);
 };
 
 class PageTable {

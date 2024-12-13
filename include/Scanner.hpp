@@ -2,9 +2,10 @@
 #define POLICY_CLASSIFIER_HPP
 
 #include "PageTable.hpp"
-#include <chrono>
 #include "RingBuffer.hpp"
 #include "Common.hpp"
+
+#include <chrono>
 
 class Scanner {
 private:

@@ -1,6 +1,6 @@
 #include "PageTable.hpp"
 
-PageMetadata::PageMetadata(int addr, int layer)
+PageMetadata::PageMetadata(void* addr, int layer)
     : page_address(addr),
     page_layer(layer),
     last_access_time(std::chrono::steady_clock::now()),
