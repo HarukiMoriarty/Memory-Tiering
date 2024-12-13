@@ -1,11 +1,12 @@
 #include "Scanner.hpp"
-#include <thread>
+
 #include <iostream>
 #include <boost/chrono.hpp>
 #include <boost/thread/thread.hpp> 
 
 Scanner::Scanner(PageTable& page_table)
-    : page_table_(page_table), running_(false) {}
+    : page_table_(page_table), running_(false) {
+}
 
 // Check if a page is hot based on both access count and time threshold
 bool Scanner::classifyHotPage(const PageMetadata& page, size_t min_access_count) const {
@@ -39,9 +40,9 @@ void Scanner::runClassifier(RingBuffer<MemMoveReq>& move_page_buffer, size_t min
         while (!move_page_buffer.push(msg)) {
             boost::this_thread::sleep_for(boost::chrono::nanoseconds(100));
         }
-        
+
         // Sleep for a short duration to prevent tight loop
-        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        boost::this_thread::sleep_for(boost::chrono::milliseconds(10));
     }
 }
 

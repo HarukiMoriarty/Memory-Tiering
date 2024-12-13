@@ -13,7 +13,7 @@ int main(int argc, char* argv[]) {
         return config.isHelpRequested() ? 0 : 1;
     }
 
-    RingBuffer<Message> client_req_buffer(config.getBufferSize());
+    RingBuffer<ClientMessage> client_req_buffer(config.getBufferSize());
     std::vector<int> memory_sizes;
     const auto& client_configs = config.getClientConfigs();
     for (const auto& client_config : client_configs) {

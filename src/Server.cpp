@@ -4,7 +4,7 @@
 #include <boost/chrono.hpp>
 #include <boost/thread/thread.hpp> 
 
-Server::Server(RingBuffer<Message>& client_buffer, RingBuffer<MemMoveReq>& move_page_buffer, const std::vector<int>& client_memory_sizes)
+Server::Server(RingBuffer<ClientMessage>& client_buffer, RingBuffer<MemMoveReq>& move_page_buffer, const std::vector<int>& client_memory_sizes)
     : client_buffer_(client_buffer), move_page_buffer_(move_page_buffer) {
     // Calculate base addresses for each client
     int current_base = 0;
@@ -16,7 +16,7 @@ Server::Server(RingBuffer<Message>& client_buffer, RingBuffer<MemMoveReq>& move_
 
 void Server::runManagerThread() {
     while (true) {
-        Message msg(0, 0, OperationType::READ);
+        ClientMessage msg(0, 0, OperationType::READ);
         MemMoveReq move_msg(0, 0);
 
         // Get memory request from client

@@ -53,9 +53,11 @@ PageMetadata PageTable::scanNext() {
     if (table_.empty()) {
         return PageMetadata(); // Handle empty table case
     }
+
     // Return the current page and move to the next index (circularly)
     PageMetadata page = table_[current_index_];
     current_index_ = (current_index_ + 1) % table_.size(); // Wrap around using modulo
+
     return page;
 }
 

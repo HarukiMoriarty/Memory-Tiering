@@ -61,12 +61,12 @@ public:
 };
 
 
-struct Message {
+struct ClientMessage {
     int client_id;
     int offset;
     OperationType op_type;
 
-    Message(int id, int off, OperationType op)
+    ClientMessage(int id, int off, OperationType op)
         : client_id(id), offset(off), op_type(op) {
     }
 
