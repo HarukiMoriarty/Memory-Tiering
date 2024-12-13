@@ -4,7 +4,7 @@ PageMetadata::PageMetadata(int addr, int layer)
     : page_address(addr),
     page_layer(layer),
     last_access_time(std::chrono::steady_clock::now()),
-    access_count(0),
+    access_count(0)
 {
 }
 
@@ -59,7 +59,7 @@ PageMetadata PageTable::scanNext() {
     return page;
 }
 
-void resetAccessCount() {
+void PageTable::resetAccessCount() {
     boost::unique_lock<boost::shared_mutex> lock(mutex_);
     for (auto& page : table_) {
         page.access_count = 0; // Reset access count
