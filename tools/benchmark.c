@@ -14,7 +14,7 @@
 
 #define PAGE_SIZE 4096
 #define PAGE_NUM 100000
-#define ITERATIONS 10
+#define ITERATIONS 1
 #define PMEM_FILE "/mnt/pmem1-aos/latency_test"
 // #define DAX_DEVICE "/dev/dax1.0"  
 #define MAP_SIZE 2097152       
@@ -132,8 +132,10 @@ uint64_t access_random_page(void* addr, size_t page_num, mem_access_mode mode) {
             page[offset] = 44;     // Write to a random page
             break;
         case READ_WRITE:
-            value = page[offset]; // Read from the page
-            page[offset] = 44;     // Write to a random page
+            // value = page[offset]; // Read from the page
+            // page[offset] = 44;     // Write to a random page
+            uint64_t value_2;
+            memcpy(&value_2, (const void*)&page[offset], sizeof(uint64_t));
             break;
         default:
             break;
@@ -265,7 +267,7 @@ int main() {
 
     // Step 4: Access the DRAM page on the remote NUMA node and measure the access time
     for (int i = 0; i < ITERATIONS; ++i) {
-        total_remote_access_time += access_random_page(dram_page, PAGE_NUM, READ);
+        total_remote_access_time += access_random_page(dram_page, PAGE_NUM, READ_WRITE);
     }
 
     // Cleanup DRAM page
@@ -279,7 +281,7 @@ int main() {
 
     // Step 6: Access the PMEM page and measure the access time
     for (int i = 0; i < ITERATIONS; ++i) {
-        total_pmem_access_time += access_random_page_pmem(pmem_page, PAGE_NUM, READ);
+        total_pmem_access_time += access_random_page_pmem(pmem_page, PAGE_NUM, READ_WRITE);
     }
 
     // Cleanup PMEM page
@@ -301,7 +303,7 @@ int main() {
     // Calculate and print the averages
     double avg_alloc_time = (double)total_alloc_time;
     double avg_local_access_time = (double)total_local_access_time / ITERATIONS;
-    double avg_move_time = (double)total_move_time;
+    double avg_move_time = (double)total_move_time / PAGE_NUM;
     double avg_remote_access_time = (double)total_remote_access_time / ITERATIONS;
     double avg_pmem_alloc_time = (double)total_pmem_alloc_time;
     double avg_pmem_access_time = (double)total_pmem_access_time / ITERATIONS;
