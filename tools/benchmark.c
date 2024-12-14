@@ -14,12 +14,14 @@
 
 #define PAGE_SIZE 4096
 #define PAGE_NUM 100000
-#define ITERATIONS 10000 
+#define ITERATIONS 10
 #define PMEM_FILE "/mnt/pmem1-aos/latency_test"
 // #define DAX_DEVICE "/dev/dax1.0"  
 #define MAP_SIZE 2097152       
 
 int page_access_track[PAGE_NUM] = {0};
+int offset_count = 100000;
+int* offsets;
 
 typedef enum  {
     READ = 0,
@@ -113,44 +115,40 @@ void move_pages_to_node(void* addr, size_t size, size_t number, int target_node)
 
 // Access the random memory and measure the time taken
 uint64_t access_random_page(void* addr, size_t page_num, mem_access_mode mode) {
-    flush_cache(addr);
     volatile uint64_t* page = (volatile uint64_t*)addr;
     uint64_t start_time = get_time_ns();
 
-    int random_page = rand() % page_num;
-    int offset = random_page * PAGE_SIZE / sizeof(uint64_t);
-    volatile uint64_t value;
-    // Perform a simple read/write operation
-    switch (mode)
-    {
-    case READ:
-        value = page[offset]; // Read from the page
-        break;
-    case WRITE:
-        page[offset] = 44;     // Write to a random page
-        break;
-    case READ_WRITE:
-        value = page[offset]; // Read from the page
-        page[offset] = 44;     // Write to a random page
-        break;
-    default:
-        break;
+    for (size_t i = 0; i < offset_count; i++) {
+        flush_cache(addr);
+        int offset = offsets[i];
+        volatile uint64_t value;
+        // Perform a simple read/write operation
+        switch (mode)
+        {
+        case READ:
+            value = page[offset]; // Read from the page
+            break;
+        case WRITE:
+            page[offset] = 44;     // Write to a random page
+            break;
+        case READ_WRITE:
+            value = page[offset]; // Read from the page
+            page[offset] = 44;     // Write to a random page
+            break;
+        default:
+            break;
+        }
     }
 
 #ifdef DEBUG
     page_access_track[random_page]++;
 #endif
 
-    return get_time_ns() - start_time;
+    return (get_time_ns() - start_time)/offset_count;
 }
 
 // Access the random memory and measure the time taken
 uint64_t access_random_page_pmem(void* addr, size_t page_num, mem_access_mode mode) {
-    int offset_count = 100;
-    int* offsets = (int*)malloc(offset_count * sizeof(int));
-    for (size_t i = 0; i < offset_count; i++) {
-        offsets[i] = (rand() % page_num) * PAGE_SIZE / sizeof(uint64_t);
-    };
     volatile uint64_t* page = (volatile uint64_t*)addr;
     uint64_t start_time = get_time_ns();
     // Perform a simple read/write operation
@@ -207,6 +205,12 @@ int main() {
     // Set the random seed
     srand(time(NULL));
 
+    // Generate random offsets
+    offsets = (int*)malloc(offset_count * sizeof(int));
+    for (size_t i = 0; i < offset_count; i++) {
+        offsets[i] = (rand() % PAGE_NUM) * PAGE_SIZE / sizeof(uint64_t);
+    };
+
     // Create and prepare the PMEM file
     int fd = open(PMEM_FILE, O_RDWR, 0666);
     if (fd < 0) {
@@ -246,7 +250,7 @@ int main() {
 
     // Step 2: Access the DRAM page locally and measure the access time
     for (int i = 0; i < ITERATIONS; ++i) {
-        total_local_access_time += access_random_page(dram_page, PAGE_NUM, READ_WRITE);
+        total_local_access_time += access_random_page(dram_page, PAGE_NUM, READ);
     }
 
 #ifdef DEBUG
@@ -261,7 +265,7 @@ int main() {
 
     // Step 4: Access the DRAM page on the remote NUMA node and measure the access time
     for (int i = 0; i < ITERATIONS; ++i) {
-        total_remote_access_time += access_random_page(dram_page, PAGE_NUM, READ_WRITE);
+        total_remote_access_time += access_random_page(dram_page, PAGE_NUM, READ);
     }
 
     // Cleanup DRAM page
