@@ -58,6 +58,10 @@ inline int* init_offsets() {
     return offsets;
 }
 
+//======================================
+// Allocation
+//======================================
+
 // Allocate memory pages on DRAM
 // size: size of each page (e.g., PAGE_SIZE)
 // number: number of pages to allocate
@@ -82,6 +86,10 @@ inline void* allocate_pmem_pages(int fd, size_t size, size_t number) {
     }
     return mem;
 }
+
+//======================================
+// Page Migration
+//======================================
 
 // Move a single page to another NUMA node
 // addr: address of the page start
@@ -140,6 +148,31 @@ inline void move_pages_to_node(void* addr, size_t size, size_t number, int targe
     free(nodes);
     free(status);
 }
+
+// Migrate one page from one tier to another
+inline void migrate_page(void* addr, int current_tier, int target_tier) {
+    // TODO: Handle migration logic
+    // Case 1: If both current and target tiers are NUMA nodes
+    if ((current_tier == 1 || current_tier == 2) &&
+        (target_tier == 1 || target_tier == 2)) {
+        // TODO: simply use move_page_to_node
+        move_page_to_node(addr, target_tier);
+    }
+    // Case 2: If one tier is in PMEM
+    else if (current_tier == 3) {
+        // TODO: select one page in target_tier for exchange
+    }
+    else if (target_tier == 3) {
+        // TODO: select one page in current_tier for exchange
+    }
+    else {
+        // TODO: potential corner case...
+    }
+}
+
+//======================================
+// Memory Access
+//======================================
 
 // Access the specified memory page
 inline uint64_t access_page(void* addr, mem_access_mode mode) {
