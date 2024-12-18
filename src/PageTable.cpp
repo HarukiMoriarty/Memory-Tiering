@@ -1,6 +1,6 @@
 #include "PageTable.hpp"
 
-PageMetadata::PageMetadata(void* addr, int layer, int id)
+PageMetadata::PageMetadata(void* addr, PageLayer layer, int id)
     : page_address(addr),
     page_layer(layer),
     page_id(id),
@@ -39,7 +39,7 @@ void PageTable::updateAccess(size_t index) {
     }
 }
 
-void PageTable::updatePageLayer(size_t index, int new_layer) {
+void PageTable::updatePageLayer(size_t index, PageLayer new_layer) {
     boost::unique_lock<boost::shared_mutex> lock(mutex_);
     if (index < table_.size()) {
         table_[index].page_layer = new_layer;
