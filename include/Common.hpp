@@ -116,4 +116,10 @@ struct MemMoveReq {
     }
 };
 
+struct ServerMemoryConfig {
+    size_t local_numa_size;
+    size_t remote_numa_size;
+    size_t pmem_size;
+};
+
 #endif // COMMON_H

@@ -150,19 +150,21 @@ inline void move_pages_to_node(void* addr, size_t size, size_t number, int targe
 }
 
 // Migrate one page from one tier to another
-inline void migrate_page(void* addr, int current_tier, int target_tier) {
+inline void migrate_page(void* addr, PageLayer current_tier, PageLayer target_tier) {
     // TODO: Handle migration logic
     // Case 1: If both current and target tiers are NUMA nodes
-    if ((current_tier == 1 || current_tier == 2) &&
-        (target_tier == 1 || target_tier == 2)) {
+    if ((current_tier == PageLayer::NUMA_LOCAL || current_tier == PageLayer::NUMA_REMOTE) &&
+        (target_tier == PageLayer::NUMA_LOCAL || target_tier == PageLayer::NUMA_REMOTE)) {
         // TODO: simply use move_page_to_node
-        move_page_to_node(addr, target_tier);
+        // numa_local = 0, numa_remote = 1
+        int target_node = target_tier == PageLayer::NUMA_LOCAL ? 0 : 1;
+        move_page_to_node(addr, target_node);
     }
     // Case 2: If one tier is in PMEM
-    else if (current_tier == 3) {
+    else if (current_tier == PageLayer::PMEM) {
         // TODO: select one page in target_tier for exchange
     }
-    else if (target_tier == 3) {
+    else if (target_tier == PageLayer::PMEM) {
         // TODO: select one page in current_tier for exchange
     }
     else {

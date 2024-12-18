@@ -4,8 +4,9 @@
 #include <boost/chrono.hpp>
 #include <boost/thread/thread.hpp> 
 
-Server::Server(RingBuffer<ClientMessage>& client_buffer, RingBuffer<MemMoveReq>& move_page_buffer, const std::vector<int>& client_memory_sizes)
-    : client_buffer_(client_buffer), move_page_buffer_(move_page_buffer) {
+Server::Server(RingBuffer<ClientMessage>& client_buffer, RingBuffer<MemMoveReq>& move_page_buffer, 
+    const std::vector<int>& client_memory_sizes, const ServerMemoryConfig& server_config)
+    : client_buffer_(client_buffer), move_page_buffer_(move_page_buffer), server_config_(server_config) {
     // Calculate base addresses for each client
     int current_base = 0;
     for (int size : client_memory_sizes) {
@@ -15,6 +16,8 @@ Server::Server(RingBuffer<ClientMessage>& client_buffer, RingBuffer<MemMoveReq>&
     
     // Init PageTable with the total memory size
     page_table_ = new PageTable(current_base);
+
+    scanner_ = new Scanner(*page_table_);
 }
 
 // Helper function to handle a ClientMessage
@@ -49,8 +52,8 @@ void Server::handleMemoryMoveRequest(const MemMoveReq& req) {
     }
 
     // Determine the target NUMA node or memory layer
-    int target_node = req.layer_id;
-    int current_node = page_meta.page_layer;
+    PageLayer target_node = req.layer_id;
+    PageLayer current_node = page_meta.page_layer;
 
     if (current_node == target_node) {
         std::cout << "Page " << page_id << " is already on the desired layer." << std::endl;
@@ -72,7 +75,7 @@ void Server::handleMemoryMoveRequest(const MemMoveReq& req) {
 void Server::runManagerThread() {
     while (true) {
         ClientMessage client_msg(0, 0, OperationType::READ);
-        MemMoveReq move_msg(0, 0);
+        MemMoveReq move_msg(0, PageLayer::NUMA_LOCAL);
 
         // Get memory request from client
         if (client_buffer_.pop(client_msg)) {
@@ -94,7 +97,10 @@ void Server::runManagerThread() {
 // Policy thread logic
 void Server::runPolicyThread() {
     // TODO: Scan
-
+    // Pre-defined thresholds
+    size_t min_access_count = 10;
+    std::chrono::seconds time_threshold(10);
+    scanner_->runClassifier(move_page_buffer_, min_access_count, time_threshold);
     // TODO: Policy -> move page decision
 }
 
