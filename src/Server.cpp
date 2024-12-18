@@ -15,6 +15,8 @@ Server::Server(RingBuffer<ClientMessage>& client_buffer, RingBuffer<MemMoveReq>&
     
     // Init PageTable with the total memory size
     page_table_ = new PageTable(current_base);
+
+    scanner_ = new Scanner(*page_table_);
 }
 
 // Helper function to handle a ClientMessage
@@ -94,7 +96,10 @@ void Server::runManagerThread() {
 // Policy thread logic
 void Server::runPolicyThread() {
     // TODO: Scan
-
+    // Pre-defined thresholds
+    size_t min_access_count = 10;
+    std::chrono::seconds time_threshold(10);
+    scanner_->runClassifier(move_page_buffer_, min_access_count, time_threshold);
     // TODO: Policy -> move page decision
 }
 
