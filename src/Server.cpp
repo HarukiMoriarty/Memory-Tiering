@@ -49,8 +49,8 @@ void Server::handleMemoryMoveRequest(const MemMoveReq& req) {
     }
 
     // Determine the target NUMA node or memory layer
-    int target_node = req.layer_id;
-    int current_node = page_meta.page_layer;
+    PageLayer target_node = req.layer_id;
+    PageLayer current_node = page_meta.page_layer;
 
     if (current_node == target_node) {
         std::cout << "Page " << page_id << " is already on the desired layer." << std::endl;
@@ -72,7 +72,7 @@ void Server::handleMemoryMoveRequest(const MemMoveReq& req) {
 void Server::runManagerThread() {
     while (true) {
         ClientMessage client_msg(0, 0, OperationType::READ);
-        MemMoveReq move_msg(0, 0);
+        MemMoveReq move_msg(0, PageLayer::NUMA_LOCAL);
 
         // Get memory request from client
         if (client_buffer_.pop(client_msg)) {
