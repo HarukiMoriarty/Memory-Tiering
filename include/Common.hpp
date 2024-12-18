@@ -15,6 +15,27 @@ enum class AccessPattern {
     SKEWED_70_20_10
 };
 
+enum class PageLayer {
+    NUMA_LOCAL,
+    NUMA_REMOTE,
+    PMEM
+};
+
+inline std::ostream& operator<<(std::ostream& os, const PageLayer& layer) {
+    switch (layer) {
+    case PageLayer::NUMA_LOCAL:
+        os << "NUMA_LOCAL";
+        break;
+    case PageLayer::NUMA_REMOTE:
+        os << "NUMA_REMOTE";
+        break;
+    case PageLayer::PMEM:
+        os << "PMEM";
+        break;
+    }
+    return os;
+}
+
 class MemoryAccessGenerator {
 private:
     AccessPattern pattern_;
@@ -81,9 +102,9 @@ struct ClientMessage {
 
 struct MemMoveReq {
     int page_id;
-    int layer_id;
+    PageLayer layer_id;
 
-    MemMoveReq(int page_id, int layer_id)
+    MemMoveReq(int page_id, PageLayer layer_id)
         : page_id(page_id), layer_id(layer_id) {
     }
 

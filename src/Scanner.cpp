@@ -27,18 +27,49 @@ void Scanner::runClassifier(RingBuffer<MemMoveReq>& move_page_buffer, size_t min
     while (running_) {
         PageMetadata page = page_table_.scanNext();
 
-        // Classify the page as hot or cold
-        if (classifyHotPage(page, min_access_count)) {
-            std::cout << "Hot page detected: " << page.page_address << std::endl;
+        switch (page.page_layer) {
+        case PageLayer::NUMA_LOCAL: {
+            // Only detect cold pages for local NUMA
+            if (classifyColdPage(page, time_threshold)) {
+                std::cout << "Cold page detected in NUMA_LOCAL: " << page.page_address << std::endl;
+                MemMoveReq msg(page.page_id, PageLayer::NUMA_REMOTE);
+                while (!move_page_buffer.push(msg)) {
+                    boost::this_thread::sleep_for(boost::chrono::nanoseconds(100));
+                }
+            }
+            break;
         }
 
-        if (classifyColdPage(page, time_threshold)) {
-            std::cout << "Cold page detected: " << page.page_address << std::endl;
+        case PageLayer::NUMA_REMOTE: {
+            // Check cold first, then hot if not cold
+            if (classifyColdPage(page, time_threshold)) {
+                std::cout << "Cold page detected in NUMA_REMOTE: " << page.page_address << std::endl;
+                MemMoveReq msg(page.page_id, PageLayer::PMEM);
+                while (!move_page_buffer.push(msg)) {
+                    boost::this_thread::sleep_for(boost::chrono::nanoseconds(100));
+                }
+            }
+            else if (classifyHotPage(page, min_access_count)) {
+                std::cout << "Hot page detected in NUMA_REMOTE: " << page.page_address << std::endl;
+                MemMoveReq msg(page.page_id, PageLayer::NUMA_LOCAL);
+                while (!move_page_buffer.push(msg)) {
+                    boost::this_thread::sleep_for(boost::chrono::nanoseconds(100));
+                }
+            }
+            break;
         }
 
-        MemMoveReq msg(page.page_id, 1);
-        while (!move_page_buffer.push(msg)) {
-            boost::this_thread::sleep_for(boost::chrono::nanoseconds(100));
+        case PageLayer::PMEM: {
+            // Only detect hot pages for PMEM
+            if (classifyHotPage(page, min_access_count)) {
+                std::cout << "Hot page detected in PMEM: " << page.page_address << std::endl;
+                MemMoveReq msg(page.page_id, PageLayer::NUMA_REMOTE);
+                while (!move_page_buffer.push(msg)) {
+                    boost::this_thread::sleep_for(boost::chrono::nanoseconds(100));
+                }
+            }
+            break;
+        }
         }
 
         // Sleep for a short duration to prevent tight loop

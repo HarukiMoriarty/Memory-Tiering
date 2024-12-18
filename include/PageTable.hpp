@@ -6,14 +6,16 @@
 #include <vector>
 #include <chrono>
 
+#include "Common.hpp"
+
 struct PageMetadata {
     void* page_address;
-    int page_layer;
+    PageLayer page_layer;
     int page_id;
     std::chrono::steady_clock::time_point last_access_time;
     size_t access_count = 0;
 
-    PageMetadata(void* addr = 0, int layer = 0, int id = 0);
+    PageMetadata(void* addr = 0, PageLayer layer = PageLayer::NUMA_LOCAL, int id = 0);
 };
 
 class PageTable {
@@ -27,7 +29,7 @@ public:
     // Write operations  
     void updatePage(size_t index, const PageMetadata& metadata);
     void updateAccess(size_t index);
-    void updatePageLayer(size_t index, int new_layer);
+    void updatePageLayer(size_t index, PageLayer new_layer);
     PageMetadata scanNext();
     void resetAccessCount();
 
