@@ -60,8 +60,8 @@ bool ConfigParser::parse(int argc, char* argv[]) {
     }
 
     // Server configuration, order: local_numa_size, remote_numa_size, pmem_size
-    if (server_configs.size() != 1) {
-        std::cerr << "Error: Server configuration must have exactly one memory size" << std::endl;
+    if (server_configs.size() != 3) {
+        std::cerr << "Error: Server configuration must have exactly three memory size" << std::endl;
         return false;
     }
 
