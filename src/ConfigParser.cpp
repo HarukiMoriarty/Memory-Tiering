@@ -16,6 +16,8 @@ ConfigParser::ConfigParser()
             cxxopts::value<std::vector<std::string>>())
         ("s,sizes", "Memory space size for each client",
             cxxopts::value<std::vector<int>>())
+        ("c,server", "Memory configuration for server",
+            cxxopts::value<std::vector<int>>())
         ("h,help", "Print usage information");
 }
 
@@ -32,6 +34,7 @@ bool ConfigParser::parse(int argc, char* argv[]) {
     message_count_ = result["messages"].as<int>();
     auto patterns = result["patterns"].as<std::vector<std::string>>();
     auto sizes = result["sizes"].as<std::vector<int>>();
+    auto server_configs = result["server"].as<std::vector<int>>();
 
     if (patterns.size() != sizes.size()) {
         std::cerr << "Error: Number of patterns must match number of memory sizes" << std::endl;
@@ -55,6 +58,17 @@ bool ConfigParser::parse(int argc, char* argv[]) {
 
         client_configs_.push_back(config);
     }
+
+    // Server configuration, order: local_numa_size, remote_numa_size, pmem_size
+    if (server_configs.size() != 1) {
+        std::cerr << "Error: Server configuration must have exactly one memory size" << std::endl;
+        return false;
+    }
+
+    server_memory_config_.local_numa_size = server_configs[0];
+    server_memory_config_.remote_numa_size = server_configs[1];
+    server_memory_config_.pmem_size = server_configs[2];
+
 
     return true;
 }
