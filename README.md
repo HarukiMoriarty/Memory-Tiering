@@ -36,7 +36,7 @@ To start the evaluation, run the following command:
 
 ```bash
 $ make
-$ LOG_LEVEL=info ./build/main -p uniform,skewed,uniform -c 1000,2000,1500 -b 100 -m 1000 -s 1280,5120,21480 --hot-access-cnt 10 --cold-access-interval 1000
+$ LOG_LEVEL=info ./build/main -p uniform,skewed,uniform -c 1000,2000,1500 -b 100 -m 1000 -t 3 -s 1280,5120,21480 --hot-access-cnt 10 --cold-access-interval 1000
 ```
 
 Where:
@@ -44,6 +44,7 @@ Where:
 - `-c`, `--client-addr-space-sizes`: Address space size for each client
 - `-b`, `--buffer-size`: Size of ring buffer
 - `-m`, `--messages`: Number of messages per client
+- `-t`, `--num-tiers`: Number of memory tiers
 - `-s`, `--mem-sizes`: Memory configuration for each tiering
 - `-h`, `--help`: Print usage information
 - `--hot-access-cnt`: Hot access cnt for promote a page

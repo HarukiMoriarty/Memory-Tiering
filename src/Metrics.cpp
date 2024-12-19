@@ -16,6 +16,18 @@ void Metrics::printMetrics() const {
     LOG_INFO("===================================");
 }
 
+void Metrics::printMetricsTwoTiers() const {
+    LOG_INFO("======== Memory Access Metrics (Two Tiers) ========");
+    LOG_INFO("Access Counts:");
+    LOG_INFO("  DRAM: "  << (local_access_count_.load() + remote_access_count_.load()));
+    LOG_INFO("  PMEM: " << pmem_access_count_.load());
+
+    LOG_INFO("Migration Counts:");
+    LOG_INFO("  DRAM -> PMEM: " << local_to_pmem_count_.load());
+    LOG_INFO("  PMEM -> DRAM: " << pmem_to_local_count_.load());
+    LOG_INFO("==========================================");
+}
+
 void Metrics::reset() {
     local_access_count_ = 0;
     remote_access_count_ = 0;

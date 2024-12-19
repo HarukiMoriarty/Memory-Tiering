@@ -39,6 +39,7 @@ private:
     std::vector<bool> client_done_flags_;
 
     // Number of pages in each tier, stored for convenience
+    size_t num_tiers_;
     size_t local_page_count_ = 0;
     size_t remote_page_count_ = 0;
     size_t pmem_page_count_ = 0;

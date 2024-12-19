@@ -19,6 +19,8 @@ ConfigParser::ConfigParser()
             cxxopts::value<std::vector<std::string>>())
         ("c,client-addr-space-sizes", "Address space size for each client",
             cxxopts::value<std::vector<size_t>>())
+        ("t,num-tiers", "Number of memory tiers",
+            cxxopts::value<size_t>()->default_value("3"))
         ("s,mem-sizes", "Memory size for each tiering",
             cxxopts::value<std::vector<size_t>>())
         ("hot-access-cnt", "Access count for determine a hot page",
@@ -82,12 +84,18 @@ bool ConfigParser::parse(int argc, char* argv[]) {
     }
 
     // Parse server memory configuration
+    size_t num_tiers_ = result["num-tiers"].as<size_t>();
+    if (num_tiers_ < 2 || num_tiers_ > 4) {
+        LOG_ERROR("Error: Number of tiers must be at least 2 and at most 3");
+        return false;
+    }
     // Expected order: local_numa_size, remote_numa_size, pmem_size
     if (mem_sizes.size() != 3) {
         LOG_ERROR("Error: Server configuration must have exactly three memory sizes");
         return false;
     }
 
+    server_memory_config_.num_tiers = num_tiers_;
     server_memory_config_.local_numa_size = mem_sizes[0];
     server_memory_config_.remote_numa_size = mem_sizes[1];
     server_memory_config_.pmem_size = mem_sizes[2];
@@ -111,11 +119,20 @@ void ConfigParser::printConfig() const {
     LOG_INFO("  - Hot Access Count: " << policy_config_.hot_access_cnt);
     LOG_INFO("  - Cold Access Interval: " << policy_config_.cold_access_interval << " ms");
 
+    // Number of tiers
+    LOG_INFO("Number of Tiers: " << server_memory_config_.num_tiers);
     // Server memory configuration
     LOG_INFO("Memory Tier Sizes:");
-    LOG_INFO("  - Local NUMA: " << server_memory_config_.local_numa_size << " pages");
-    LOG_INFO("  - Remote NUMA: " << server_memory_config_.remote_numa_size << " pages");
-    LOG_INFO("  - PMEM: " << server_memory_config_.pmem_size << " pages");
+   
+    if (server_memory_config_.num_tiers == 2) {
+        LOG_INFO("  - DRAM: " << server_memory_config_.local_numa_size + server_memory_config_.remote_numa_size  << " pages");
+        LOG_INFO("  - PMEM: " << server_memory_config_.pmem_size << " pages");
+    }
+    if (server_memory_config_.num_tiers == 3 ) {
+        LOG_INFO("  - Local NUMA: " << server_memory_config_.local_numa_size << " pages");
+        LOG_INFO("  - Remote NUMA: " << server_memory_config_.remote_numa_size << " pages");
+        LOG_INFO("  - PMEM: " << server_memory_config_.pmem_size << " pages");
+    }
 
     // Client configurations
     LOG_INFO("Client Configurations:");

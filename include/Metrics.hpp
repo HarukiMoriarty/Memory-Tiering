@@ -30,9 +30,12 @@ public:
     inline void incrementRemoteToLocal() { remote_to_local_count_++; }
     inline void incrementPmemToRemote() { pmem_to_remote_count_++; }
     inline void incrementRemoteToPmem() { remote_to_pmem_count_++; }
+    inline void incrementLocalToPmem() { local_to_pmem_count_++; }
+    inline void incrementPmemToLocal() { pmem_to_local_count_++; }
 
     // Print current metrics (call periodically or at program end)
     void printMetrics() const;
+    void printMetricsTwoTiers() const;
 
     // Reset all counters
     void reset();
@@ -50,6 +53,8 @@ private:
     std::atomic<uint64_t> remote_to_local_count_{ 0 };
     std::atomic<uint64_t> pmem_to_remote_count_{ 0 };
     std::atomic<uint64_t> remote_to_pmem_count_{ 0 };
+    std::atomic<uint64_t> local_to_pmem_count_{ 0 };
+    std::atomic<uint64_t> pmem_to_local_count_{ 0 };
 };
 
 #endif

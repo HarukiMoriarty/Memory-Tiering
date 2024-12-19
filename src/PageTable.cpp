@@ -1,4 +1,5 @@
 #include "PageTable.hpp"
+#include "Logger.hpp"
 
 PageMetadata::PageMetadata(void* addr, PageLayer layer)
     : page_address(addr),
@@ -18,6 +19,7 @@ void PageTable::initPageTable(const std::vector<size_t>& client_addr_space, cons
         total_pages += size;
     }
 
+    LOG_DEBUG("Total pages required by clients: " << total_pages);
     // Lock the table for write
     boost::unique_lock<boost::shared_mutex> lock(mutex_);
 
@@ -29,6 +31,10 @@ void PageTable::initPageTable(const std::vector<size_t>& client_addr_space, cons
     size_t local_capacity = server_config.local_numa_size;
     size_t remote_capacity = server_config.remote_numa_size;
     size_t pmem_capacity = server_config.pmem_size;
+    size_t num_tiers = server_config.num_tiers;
+    
+    LOG_DEBUG("Server capacities - Local NUMA: " << local_capacity << ", Remote NUMA: " << remote_capacity 
+            << ", PMEM: " << pmem_capacity << ", Tiers: " << num_tiers);
 
     // Compute per-client allocation for NUMA_LOCAL
     std::vector<size_t> local_allocation(client_addr_space.size(), 0);
@@ -36,22 +42,31 @@ void PageTable::initPageTable(const std::vector<size_t>& client_addr_space, cons
     std::vector<size_t> pmem_allocation(client_addr_space.size(), 0);
 
     for (size_t i = 0; i < client_addr_space.size(); ++i) {
-        // Proportional allocation for local
-        double local_fraction = (double)client_addr_space[i] * (double)local_capacity / (double)total_pages;
-        local_allocation[i] = static_cast<size_t>(std::floor(local_fraction));
+        if (num_tiers == 2) {
+            // Proportional allocation for DRAM (local + remote in 2-tier setup)
+            double dram_fraction = (double)client_addr_space[i] * (double)(local_capacity + remote_capacity) / (double)total_pages;
+            local_allocation[i] = static_cast<size_t>(std::min(std::floor(dram_fraction), (double)client_addr_space[i]));
+        } else {
+            // Proportional allocation for local NUMA in 3-tier setup
+            double local_fraction = (double)client_addr_space[i] * (double)local_capacity / (double)total_pages;
+            local_allocation[i] = static_cast<size_t>(std::min(std::floor(local_fraction), (double)client_addr_space[i]));
+        }
+        LOG_DEBUG("Client " << i << " local allocation: " << local_allocation[i]);
     }
 
-    // Compute per-client allocation for NUMA_REMOTE
-    for (size_t i = 0; i < client_addr_space.size(); ++i) {
-        size_t need_after_local = client_addr_space[i] - local_allocation[i];
-        if (need_after_local > 0) {
-            double remote_fraction = (double)client_addr_space[i] * (double)remote_capacity / (double)total_pages;
-            size_t ideal_remote = static_cast<size_t>(std::floor(remote_fraction));
-            // Assign the minimum of what they ideally get and what they still need
-            remote_allocation[i] = std::min(ideal_remote, need_after_local);
-        }
-        else {
-            remote_allocation[i] = 0;
+    // Compute per-client allocation for NUMA_REMOTE in 3-tier setup
+    if (num_tiers == 3) {
+        for (size_t i = 0; i < client_addr_space.size(); ++i) {
+            size_t need_after_local = client_addr_space[i] - local_allocation[i];
+            if (need_after_local > 0) {
+                double remote_fraction = (double)client_addr_space[i] * (double)remote_capacity / (double)total_pages;
+                size_t ideal_remote = static_cast<size_t>(std::floor(remote_fraction));
+                // Assign the minimum of what they ideally get and what they still need
+                remote_allocation[i] = std::min(ideal_remote, need_after_local);
+            }
+            else {
+                remote_allocation[i] = 0;
+            }
         }
     }
 
@@ -59,6 +74,9 @@ void PageTable::initPageTable(const std::vector<size_t>& client_addr_space, cons
     for (size_t i = 0; i < client_addr_space.size(); ++i) {
         size_t allocated_so_far = local_allocation[i] + remote_allocation[i];
         size_t need_after_remote = client_addr_space[i] - allocated_so_far;
+        LOG_DEBUG("  - Total Address Space: " << client_addr_space[i]);
+        LOG_DEBUG("  - Allocated So Far: " << allocated_so_far);
+        LOG_DEBUG("  - Remaining Need After Remote: " << need_after_remote);
         if (need_after_remote > 0) {
             // Assign what's left to PMEM
             pmem_allocation[i] = need_after_remote;
@@ -66,6 +84,7 @@ void PageTable::initPageTable(const std::vector<size_t>& client_addr_space, cons
         else {
             pmem_allocation[i] = 0;
         }
+        LOG_DEBUG("Client " << i << " PMEM allocation: " << pmem_allocation[i]);
     }
 
     // Check if we've allocated all pages correctly
@@ -97,6 +116,7 @@ void PageTable::initPageTable(const std::vector<size_t>& client_addr_space, cons
             current_index++;
             offset++;
         }
+        LOG_DEBUG("Filled " << count << " pages for layer " << static_cast<int>(layer));
         };
 
     for (size_t client_id = 0; client_id < client_addr_space.size(); ++client_id) {

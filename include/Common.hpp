@@ -56,6 +56,7 @@ inline std::ostream& operator<<(std::ostream& os, const PageLayer& layer) {
  * Configuration structure for server memory tiers
  */
 struct ServerMemoryConfig {
+    size_t num_tiers;
     size_t local_numa_size;   // Size of local NUMA memory
     size_t remote_numa_size;  // Size of remote NUMA memory
     size_t pmem_size;         // Size of persistent memory

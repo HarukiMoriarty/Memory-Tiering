@@ -25,7 +25,6 @@ Server::Server(RingBuffer<ClientMessage>& client_buffer, RingBuffer<MemMoveReq>&
 
     // Allocate memory based on the server config
     allocateMemory(server_config);
-
     // After allocating memory, generate random content in all tiers
     generateRandomContent();
 
@@ -50,14 +49,21 @@ void Server::allocateMemory(const ServerMemoryConfig& config) {
     local_page_count_ = config.local_numa_size;
     remote_page_count_ = config.remote_numa_size;
     pmem_page_count_ = config.pmem_size;
+    num_tiers_ = config.num_tiers;
 
     // Allocate local NUMA memory
-    local_base_ = allocate_and_bind_to_numa(PAGE_SIZE, local_page_count_, 0);
-
-    // Allocate memory for remote NUMA pages 
-    remote_base_ = allocate_and_bind_to_numa(PAGE_SIZE, remote_page_count_, 1);
-
-    // Allocate PMEM pages
+    if (num_tiers_ == 2) {
+        // For 2 tiers, combine local and remote NUMA memory into DRAM
+        // Allocate DRAM
+        local_base_ = allocate_pages(PAGE_SIZE, local_page_count_ + remote_page_count_);
+    } 
+    else{
+        // Allocate local NUMA memory
+        local_base_ = allocate_and_bind_to_numa(PAGE_SIZE, local_page_count_, 0);
+        // Allocate memory for remote NUMA pages 
+        remote_base_ = allocate_and_bind_to_numa(PAGE_SIZE, remote_page_count_, 1);
+    }
+    // Allocate PMEM memory
     pmem_base_ = allocate_and_bind_to_numa(PAGE_SIZE, pmem_page_count_, 2);
 }
 
@@ -65,12 +71,14 @@ void Server::generateRandomContent() {
     // Seed the random number generator
     srand(static_cast<unsigned>(time(NULL)));
 
-    size_t local_size = local_page_count_ * PAGE_SIZE;
-    size_t remote_size = remote_page_count_ * PAGE_SIZE;
+    size_t local_size = (num_tiers_ == 2) ? (local_page_count_ + remote_page_count_) * PAGE_SIZE : local_page_count_ * PAGE_SIZE;
+    size_t remote_size = (num_tiers_ == 3) ? remote_page_count_ * PAGE_SIZE : 0;
     size_t pmem_size = pmem_page_count_ * PAGE_SIZE;
 
     LOG_DEBUG("Local size: " << local_size);
-    LOG_DEBUG("Remote size: " << remote_size);
+    if (num_tiers_ == 3) {
+        LOG_DEBUG("Remote size: " << remote_size);
+    }
     LOG_DEBUG("PMEM size: " << pmem_size);
 
     // Fill local tier
@@ -83,13 +91,13 @@ void Server::generateRandomContent() {
     LOG_DEBUG("Random content generated for local numa node.");
 
     // Fill remote tier
-    {
+    if (num_tiers_ == 3) {
         unsigned char* base = static_cast<unsigned char*>(remote_base_);
         for (size_t i = 0; i < remote_size; i++) {
             base[i] = static_cast<unsigned char>(rand() % 256);
         }
+        LOG_DEBUG("Random content generated for remote NUMA node.");
     }
-    LOG_DEBUG("Random content generated for remote numa node.");
 
     // Fill pmem tier
     {
@@ -113,7 +121,10 @@ void Server::handleClientMessage(const ClientMessage& msg) {
         // Check if all clients are done
         if (std::all_of(client_done_flags_.begin(), client_done_flags_.end(), [](bool done) { return done; })) {
             LOG_INFO("All clients sent END command. Printing metrics...");
-            Metrics::getInstance().printMetrics();
+            if (num_tiers_ == 3) {Metrics::getInstance().printMetrics();}
+            else{
+                Metrics::getInstance().printMetricsTwoTiers();
+            }
             signalShutdown();  // Exit the server gracefully
         }
         return;
@@ -175,6 +186,12 @@ void Server::handleMemoryMoveRequest(const MemMoveReq& req) {
     else if (current_node == PageLayer::NUMA_REMOTE && target_node == PageLayer::PMEM) {
         Metrics::getInstance().incrementRemoteToPmem();
     }
+    else if (current_node == PageLayer::NUMA_LOCAL && target_node == PageLayer::PMEM) {
+    Metrics::getInstance().incrementLocalToPmem(); 
+    }
+    else if (current_node == PageLayer::PMEM && target_node == PageLayer::NUMA_LOCAL) {
+        Metrics::getInstance().incrementPmemToLocal();
+    }
 
     // Perform the page migration
     LOG_DEBUG("Moving Page " << page_id << " from Node " << current_node << " to Node " << target_node << "...");
@@ -213,7 +230,7 @@ void Server::runManagerThread() {
 void Server::runPolicyThread() {
   
     // Pre-defined thresholds
-    scanner_->runClassifier(move_page_buffer_, policy_config_.hot_access_cnt, boost::chrono::milliseconds(policy_config_.cold_access_interval), *this);
+    scanner_->runClassifier(move_page_buffer_, policy_config_.hot_access_cnt, boost::chrono::milliseconds(policy_config_.cold_access_interval), num_tiers_, *this);
     LOG_DEBUG("Policy thread exiting...");
 }
 
