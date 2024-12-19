@@ -194,7 +194,8 @@ void Server::handleMemoryMoveRequest(const MemMoveReq& req) {
 
     // Perform the page migration
     LOG_DEBUG("Moving Page " << page_id << " from Node " << current_node << " to Node " << target_node << "...");
-    migrate_page(page_meta.page_address, current_node, target_node);
+    uint64_t migrate_time = migrate_page(page_meta.page_address, current_node, target_node);
+    LOG_DEBUG("Migration time: " << migrate_time << " ns");
 
     // After the move, update the page layer in the PageTable
     page_table_->updatePageLayer(page_id, req.layer_id);
