@@ -48,20 +48,11 @@ void Server::allocateMemory(const ServerMemoryConfig& config) {
     // Allocate local NUMA memory
     local_base_ = allocate_pages(PAGE_SIZE, local_page_count_);
 
-    // TODO: Allocate memory for remote NUMA pages 
-    // (allocate locally first)
-    remote_base_ = allocate_pages(PAGE_SIZE, remote_page_count_);
-    // Move these pages to another NUMA node, e.g., node 1
-    move_pages_to_node(remote_base_, PAGE_SIZE, remote_page_count_, 1);
-
-    // TODO: Allocate PMEM pages
-    int fd = open(PMEM_FILE, O_RDWR, 0666);
-    if (fd < 0) {
-        perror("open PMEM file failed");
-        exit(EXIT_FAILURE);
-    }
-    pmem_base_ = allocate_pmem_pages(fd, PAGE_SIZE, pmem_page_count_);
-    close(fd);
+    // Allocate memory for remote NUMA pages 
+    remote_base_ = allocate_and_bind_to_numa(PAGE_SIZE, local_page_count_, 1);
+  
+    // Allocate PMEM pages
+    pmem_base_ = allocate_and_bind_to_numa(PAGE_SIZE, local_page_count_, 2);
 }
 
 // Helper function to handle a ClientMessage
@@ -153,9 +144,9 @@ void Server::runPolicyThread() {
 // Main function to start threads
 void Server::start() {
     boost::thread server_thread(&Server::runManagerThread, this);
-    boost::thread policy_thread(&Server::runPolicyThread, this);
+    // boost::thread policy_thread(&Server::runPolicyThread, this);
 
     // Join threads
     server_thread.join();
-    policy_thread.join();
+    // policy_thread.join();
 }

@@ -20,9 +20,7 @@
 #endif
 
 #define PAGE_NUM 100000
-#define ITERATIONS 1
-#define PMEM_FILE "/mnt/pmem1-aos/latency_test"
-#define MAP_SIZE 2097152       
+#define ITERATIONS 1     
 #define OFFSET_COUNT 100000
 
 typedef enum  {
@@ -75,16 +73,28 @@ inline void* allocate_pages(size_t size, size_t number) {
 }
 
 // Allocate pages on PMEM
-// fd: file descriptor of the PMEM file/region
 // size: size of each page
 // number: number of pages to allocate
-inline void* allocate_pmem_pages(int fd, size_t size, size_t number) {
-    void* mem = mmap(NULL, size * number, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_POPULATE, fd, 0);
-    if (mem == MAP_FAILED) {
-        perror("mmap PMEM failed");
-        exit(EXIT_FAILURE);
+// numa_node: numa_node to allocate the page
+void* allocate_and_bind_to_numa(size_t size, size_t number, int numa_node) {
+    // Step 1: Allocate memory using mmap
+    void* addr = mmap(NULL, size * number, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    if (addr == MAP_FAILED) {
+        perror("mmap failed");
+        return NULL;
     }
-    return mem;
+    // Step 2: Define the nodemask for the target NUMA node
+    unsigned long nodemask = (1UL << numa_node);
+    // Step 3: Directly call the mbind syscall to bind memory to the NUMA node
+    if (syscall(SYS_mbind, addr, size, MPOL_BIND, &nodemask, sizeof(nodemask) * 8, MPOL_MF_MOVE | MPOL_MF_STRICT) != 0) {
+        perror("mbind syscall failed");
+        munmap(addr, size*number);
+        return NULL;
+    }
+
+    // Step 4: Access (touch) the memory to ensure physical allocation
+    memset(addr, 0, size * number); // Initialize all memory to zero
+    return addr;
 }
 
 //======================================
@@ -151,25 +161,11 @@ inline void move_pages_to_node(void* addr, size_t size, size_t number, int targe
 
 // Migrate one page from one tier to another
 inline void migrate_page(void* addr, PageLayer current_tier, PageLayer target_tier) {
-    // TODO: Handle migration logic
-    // Case 1: If both current and target tiers are NUMA nodes
-    if ((current_tier == PageLayer::NUMA_LOCAL || current_tier == PageLayer::NUMA_REMOTE) &&
-        (target_tier == PageLayer::NUMA_LOCAL || target_tier == PageLayer::NUMA_REMOTE)) {
-        // TODO: simply use move_page_to_node
-        // numa_local = 0, numa_remote = 1
-        int target_node = target_tier == PageLayer::NUMA_LOCAL ? 0 : 1;
-        move_page_to_node(addr, target_node);
-    }
-    // Case 2: If one tier is in PMEM
-    else if (current_tier == PageLayer::PMEM) {
-        // TODO: select one page in target_tier for exchange
-    }
-    else if (target_tier == PageLayer::PMEM) {
-        // TODO: select one page in current_tier for exchange
-    }
-    else {
-        // TODO: potential corner case...
-    }
+
+    int target_node = (target_tier == PageLayer::NUMA_LOCAL) ? 0 :
+                  (target_tier == PageLayer::NUMA_REMOTE) ? 1 : 2;
+    move_page_to_node(addr, target_node);
+  
 }
 
 //======================================
