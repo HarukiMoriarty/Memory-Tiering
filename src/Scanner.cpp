@@ -24,9 +24,8 @@ bool Scanner::classifyColdPage(const PageMetadata& page, boost::chrono::millisec
 }
 
 // Continuously classify pages using scanNext()
-void Scanner::runClassifier(RingBuffer<MemMoveReq>& move_page_buffer, size_t min_access_count, boost::chrono::milliseconds time_threshold, size_t num_tiers, Server& server) {
-    running_ = true;
-    while (running_ && !server.shouldShutdown()) {
+void Scanner::runClassifier(RingBuffer<MemMoveReq>& move_page_buffer, size_t min_access_count, boost::chrono::milliseconds time_threshold, size_t num_tiers) {
+    while (running_) {
         size_t page_id = page_table_.getNextPageId();
         PageMetadata page = page_table_.scanNext();
 
@@ -41,7 +40,8 @@ void Scanner::runClassifier(RingBuffer<MemMoveReq>& move_page_buffer, size_t min
                         boost::this_thread::sleep_for(boost::chrono::nanoseconds(100));
                     }
                 }
-            } else {
+            }
+            else {
                 // For three tiers, handle NUMA_LOCAL cold pages
                 // Only detect cold pages for local NUMA
                 if (classifyColdPage(page, time_threshold)) {
@@ -84,7 +84,8 @@ void Scanner::runClassifier(RingBuffer<MemMoveReq>& move_page_buffer, size_t min
                     while (!move_page_buffer.push(msg)) {
                         boost::this_thread::sleep_for(boost::chrono::nanoseconds(100));
                     }
-                } else {
+                }
+                else {
                     // Move hot pages from PMEM to NUMA_REMOTE in a three-tier setup
                     MemMoveReq msg(page_id, PageLayer::NUMA_REMOTE);
                     while (!move_page_buffer.push(msg)) {
@@ -98,7 +99,7 @@ void Scanner::runClassifier(RingBuffer<MemMoveReq>& move_page_buffer, size_t min
 
         // Sleep for a short duration after whole table iteration
         if (page_id == page_table_.size() - 1) {
-            boost::this_thread::sleep_for(boost::chrono::milliseconds(10));
+            boost::this_thread::sleep_for(boost::chrono::milliseconds(100));
             LOG_DEBUG("Finished scanning all pages in one round!");
         }
     }

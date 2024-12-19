@@ -45,24 +45,24 @@ Server::~Server() {
 }
 
 void Server::allocateMemory(const ServerMemoryConfig& config) {
-    // Store counts
+    // Store paras
     local_page_count_ = config.local_numa_size;
     remote_page_count_ = config.remote_numa_size;
     pmem_page_count_ = config.pmem_size;
     num_tiers_ = config.num_tiers;
 
-    // Allocate local NUMA memory
     if (num_tiers_ == 2) {
         // For 2 tiers, combine local and remote NUMA memory into DRAM
-        // Allocate DRAM
+        // Allocate local NUMA memory
         local_base_ = allocate_pages(PAGE_SIZE, local_page_count_ + remote_page_count_);
-    } 
-    else{
+    }
+    else {
         // Allocate local NUMA memory
         local_base_ = allocate_and_bind_to_numa(PAGE_SIZE, local_page_count_, 0);
         // Allocate memory for remote NUMA pages 
         remote_base_ = allocate_and_bind_to_numa(PAGE_SIZE, remote_page_count_, 1);
     }
+
     // Allocate PMEM memory
     pmem_base_ = allocate_and_bind_to_numa(PAGE_SIZE, pmem_page_count_, 2);
 }
@@ -81,7 +81,7 @@ void Server::generateRandomContent() {
     }
     LOG_DEBUG("PMEM size: " << pmem_size);
 
-    // Fill local tier
+    // Fill numa local tier
     {
         unsigned char* base = static_cast<unsigned char*>(local_base_);
         for (size_t i = 0; i < local_size; i++) {
@@ -90,7 +90,7 @@ void Server::generateRandomContent() {
     }
     LOG_DEBUG("Random content generated for local numa node.");
 
-    // Fill remote tier
+    // Fill numa remote tier
     if (num_tiers_ == 3) {
         unsigned char* base = static_cast<unsigned char*>(remote_base_);
         for (size_t i = 0; i < remote_size; i++) {
@@ -105,9 +105,8 @@ void Server::generateRandomContent() {
         for (size_t i = 0; i < pmem_size; i++) {
             base[i] = static_cast<unsigned char>(rand() % 256);
         }
+        LOG_DEBUG("Random content generated for persistent memory.");
     }
-
-    LOG_DEBUG("Random content generated for persistent memory.");
 }
 
 // Helper function to handle a ClientMessage
@@ -121,8 +120,8 @@ void Server::handleClientMessage(const ClientMessage& msg) {
         // Check if all clients are done
         if (std::all_of(client_done_flags_.begin(), client_done_flags_.end(), [](bool done) { return done; })) {
             LOG_INFO("All clients sent END command. Printing metrics...");
-            if (num_tiers_ == 3) {Metrics::getInstance().printMetrics();}
-            else{
+            if (num_tiers_ == 3) { Metrics::getInstance().printMetricsThreeTiers(); }
+            else {
                 Metrics::getInstance().printMetricsTwoTiers();
             }
             signalShutdown();  // Exit the server gracefully
@@ -187,7 +186,7 @@ void Server::handleMemoryMoveRequest(const MemMoveReq& req) {
         Metrics::getInstance().incrementRemoteToPmem();
     }
     else if (current_node == PageLayer::NUMA_LOCAL && target_node == PageLayer::PMEM) {
-    Metrics::getInstance().incrementLocalToPmem(); 
+        Metrics::getInstance().incrementLocalToPmem();
     }
     else if (current_node == PageLayer::PMEM && target_node == PageLayer::NUMA_LOCAL) {
         Metrics::getInstance().incrementPmemToLocal();
@@ -199,7 +198,6 @@ void Server::handleMemoryMoveRequest(const MemMoveReq& req) {
 
     // After the move, update the page layer in the PageTable
     page_table_->updatePageLayer(page_id, req.layer_id);
-
     LOG_DEBUG("Page " << page_id << " now on Layer " << req.layer_id);
 }
 
@@ -207,20 +205,25 @@ void Server::runManagerThread() {
     while (!shouldShutdown()) {
         ClientMessage client_msg(0, 0, OperationType::READ);
         MemMoveReq move_msg(0, PageLayer::NUMA_LOCAL);
+        bool didwork = false;
 
         // Get memory request from client
         if (client_buffer_.pop(client_msg)) {
             LOG_DEBUG("Server received: " << client_msg.toString());
             handleClientMessage(client_msg);
+            didwork = true;
         }
 
         // Get page move request from policy thread
         if (move_page_buffer_.pop(move_msg)) {
             LOG_DEBUG("Server received: " << move_msg.toString());
             handleMemoryMoveRequest(move_msg);
+            didwork = true;
         }
-        else {
-            // boost::this_thread::sleep_for(boost::chrono::milliseconds(100));
+
+        // Sleep if no works was done
+        if (!didwork) {
+            boost::this_thread::sleep_for(boost::chrono::nanoseconds(100));
         }
     }
     LOG_DEBUG("Manager thread exiting...");
@@ -228,15 +231,14 @@ void Server::runManagerThread() {
 
 // Policy thread logic
 void Server::runPolicyThread() {
-  
-    // Pre-defined thresholds
-    scanner_->runClassifier(move_page_buffer_, policy_config_.hot_access_cnt, boost::chrono::milliseconds(policy_config_.cold_access_interval), num_tiers_, *this);
+    scanner_->runClassifier(move_page_buffer_, policy_config_.hot_access_cnt, boost::chrono::milliseconds(policy_config_.cold_access_interval), num_tiers_);
     LOG_DEBUG("Policy thread exiting...");
 }
 
 void Server::signalShutdown() {
     boost::lock_guard<boost::mutex> lock(shutdown_mutex_);
     shutdown_flag_ = true;
+    scanner_->stopClassifier();
 }
 
 bool Server::shouldShutdown() {

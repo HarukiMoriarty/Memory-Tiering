@@ -12,7 +12,7 @@ class Server;
 class Scanner {
 private:
     PageTable& page_table_;
-    bool running_; // To control the continuous scanning process
+    bool running_ = true; // To control the continuous scanning process
 
 public:
     // Constructor
@@ -25,7 +25,7 @@ public:
     bool classifyColdPage(const PageMetadata& page, boost::chrono::milliseconds time_threshold) const;
 
     // Continuously classify pages using scanNext()
-    void runClassifier(RingBuffer<MemMoveReq>& move_page_buffer, size_t min_access_count, boost::chrono::milliseconds time_threshold, size_t num_tiers, Server& server);
+    void runClassifier(RingBuffer<MemMoveReq>& move_page_buffer, size_t min_access_count, boost::chrono::milliseconds time_threshold, size_t num_tiers);
 
     // Stop the continuous classifier
     void stopClassifier();

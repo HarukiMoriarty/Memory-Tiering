@@ -34,7 +34,7 @@ public:
     inline void incrementPmemToLocal() { pmem_to_local_count_++; }
 
     // Print current metrics (call periodically or at program end)
-    void printMetrics() const;
+    void printMetricsThreeTiers() const;
     void printMetricsTwoTiers() const;
 
     // Reset all counters
