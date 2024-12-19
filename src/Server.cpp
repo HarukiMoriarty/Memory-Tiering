@@ -7,8 +7,8 @@
 #include <boost/thread/thread.hpp> 
 
 Server::Server(RingBuffer<ClientMessage>& client_buffer, RingBuffer<MemMoveReq>& move_page_buffer,
-    const std::vector<size_t>& client_addr_space, const ServerMemoryConfig& server_config)
-    : client_buffer_(client_buffer), move_page_buffer_(move_page_buffer), server_config_(server_config) {
+    const std::vector<size_t>& client_addr_space, const ServerMemoryConfig& server_config, const PolicyConfig& policy_config)
+    : client_buffer_(client_buffer), move_page_buffer_(move_page_buffer), server_config_(server_config), policy_config_(policy_config) {
     // Calculate base addresses for each client
     size_t current_base = 0;
     for (size_t size : client_addr_space) {
@@ -173,12 +173,8 @@ void Server::runManagerThread() {
 
 // Policy thread logic
 void Server::runPolicyThread() {
-    // TODO: Scan
     // Pre-defined thresholds
-    size_t min_access_count = 1;
-    std::chrono::milliseconds time_threshold(10);
-    scanner_->runClassifier(move_page_buffer_, min_access_count, time_threshold);
-    // TODO: Policy -> move page decision
+    scanner_->runClassifier(move_page_buffer_, policy_config_.hot_access_cnt, boost::chrono::milliseconds(policy_config_.cold_access_interval));
 }
 
 // Main function to start threads

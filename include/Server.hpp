@@ -12,7 +12,7 @@
 class Server {
 public:
     Server(RingBuffer<ClientMessage>& client_buffer, RingBuffer<MemMoveReq>& move_page_buffer_,
-        const std::vector<size_t>& client_memory_spaces, const ServerMemoryConfig& server_config);
+        const std::vector<size_t>& client_memory_spaces, const ServerMemoryConfig& server_config, const PolicyConfig& policy_config);
     ~Server();
     // Allocates memory in all three tiers and stores base addresses
     void allocateMemory(const ServerMemoryConfig& config);
@@ -30,7 +30,7 @@ private:
     PageTable* page_table_;
     Scanner* scanner_;
     ServerMemoryConfig server_config_;
-
+    PolicyConfig policy_config_;
 
     // Number of pages in each tier, stored for convenience
     size_t local_page_count_ = 0;

@@ -4,7 +4,6 @@
 #include <boost/thread/shared_mutex.hpp>
 #include <boost/thread/locks.hpp>
 #include <vector>
-#include <chrono>
 
 #include "Common.hpp"
 #include "Utils.hpp"
@@ -12,7 +11,7 @@
 struct PageMetadata {
     void* page_address;
     PageLayer page_layer;
-    std::chrono::steady_clock::time_point last_access_time;
+    boost::chrono::steady_clock::time_point last_access_time;
     size_t access_count = 0;
 
     PageMetadata(void* addr = 0, PageLayer layer = PageLayer::NUMA_LOCAL);

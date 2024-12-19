@@ -21,6 +21,10 @@ ConfigParser::ConfigParser()
             cxxopts::value<std::vector<size_t>>())
         ("s,mem-sizes", "Memory size for each tiering",
             cxxopts::value<std::vector<size_t>>())
+        ("hot-access-cnt", "Access count for determine a hot page",
+            cxxopts::value<size_t>()->default_value("10"))
+        ("cold-access-interval", "Access interval for determine a cold page",
+            cxxopts::value<size_t>()->default_value("1000"))
         ("h,help", "Print usage information");
 }
 
@@ -43,6 +47,8 @@ bool ConfigParser::parse(int argc, char* argv[]) {
     // Parse basic parameters
     buffer_size_ = result["buffer-size"].as<size_t>();
     message_count_ = result["messages"].as<size_t>();
+    policy_config_.hot_access_cnt = result["hot-access-cnt"].as<size_t>();
+    policy_config_.cold_access_interval = result["cold-access-interval"].as<size_t>();
 
     // Parse client configurations
     auto patterns = result["patterns"].as<std::vector<std::string>>();
@@ -86,5 +92,39 @@ bool ConfigParser::parse(int argc, char* argv[]) {
     server_memory_config_.remote_numa_size = mem_sizes[1];
     server_memory_config_.pmem_size = mem_sizes[2];
 
+    printConfig();
     return true;
+}
+
+/**
+ * Print all configuration parameters in a formatted way
+ */
+void ConfigParser::printConfig() const {
+    LOG_INFO("========== Configuration Parameters ==========");
+
+    // Basic parameters
+    LOG_INFO("Buffer Size: " << buffer_size_);
+    LOG_INFO("Message Count: " << message_count_);
+
+    // Policy configuration
+    LOG_INFO("Hot Page Policy:");
+    LOG_INFO("  - Hot Access Count: " << policy_config_.hot_access_cnt);
+    LOG_INFO("  - Cold Access Interval: " << policy_config_.cold_access_interval << "ms");
+
+    // Server memory configuration
+    LOG_INFO("Memory Tier Sizes:");
+    LOG_INFO("  - Local NUMA: " << server_memory_config_.local_numa_size << " pages");
+    LOG_INFO("  - Remote NUMA: " << server_memory_config_.remote_numa_size << " pages");
+    LOG_INFO("  - PMEM: " << server_memory_config_.pmem_size << " pages");
+
+    // Client configurations
+    LOG_INFO("Client Configurations:");
+    for (size_t i = 0; i < client_configs_.size(); i++) {
+        LOG_INFO("  Client " << i + 1 << ":");
+        LOG_INFO("    - Pattern: " <<
+            (client_configs_[i].pattern == AccessPattern::UNIFORM ? "Uniform" : "Skewed"));
+        LOG_INFO("    - Address Space Size: " << client_configs_[i].addr_space_size << " bytes");
+    }
+
+    LOG_INFO("==========================================");
 }

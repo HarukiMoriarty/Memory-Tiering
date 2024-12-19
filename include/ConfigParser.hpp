@@ -22,16 +22,19 @@ public:
     size_t getMessageCount() const { return message_count_; }
     const std::vector<ClientConfig>& getClientConfigs() const { return client_configs_; }
     const ServerMemoryConfig& getServerMemoryConfig() const { return server_memory_config_; }
+    const PolicyConfig& getPolicyConfig() const { return policy_config_; }
 
     bool isHelpRequested() const { return help_requested_; }
 
-
 private:
+    void printConfig() const;
+
     cxxopts::Options options_;
     size_t buffer_size_;
     size_t message_count_;
     std::vector<ClientConfig> client_configs_;
     ServerMemoryConfig server_memory_config_;
+    PolicyConfig policy_config_;
     bool help_requested_;
 };
 

@@ -14,34 +14,53 @@
 #include <emmintrin.h>
 #include <string.h>
 
-// Default page size (adjust if needed)
+//======================================
+// Constants and Configurations
+//======================================
+
 #ifndef PAGE_SIZE
-#define PAGE_SIZE 4096
+#define PAGE_SIZE 4096  // Default system page size
 #endif
 
-#define PAGE_NUM 100000
-#define ITERATIONS 1     
-#define OFFSET_COUNT 100000
+#define PAGE_NUM 100000      // Number of pages to allocate
+#define ITERATIONS 1         // Number of test iterations
+#define OFFSET_COUNT 100000  // Number of random offsets for testing
 
+/**
+ * Memory access modes for benchmarking
+ */
 typedef enum {
-    READ = 0,
-    WRITE = 1,
-    READ_WRITE = 2,
+    READ = 0,        // Read-only operations
+    WRITE = 1,       // Write-only operations
+    READ_WRITE = 2,  // Combined read-write operations
 } mem_access_mode;
 
-// Get the current timestamp in nanoseconds
+//======================================
+// Utility Functions
+//======================================
+
+/**
+ * Get current timestamp in nanoseconds
+ * @return Current time in nanoseconds
+ */
 inline uint64_t get_time_ns() {
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
     return ts.tv_sec * 1000000000ULL + ts.tv_nsec;
 }
 
-// Flush a cache line to ensure the memory operation is not served from CPU cache
+/**
+ * Flush cache line to ensure memory operation isn't served from CPU cache
+ * @param addr Address to flush from cache
+ */
 inline void flush_cache(void* addr) {
     _mm_clflush(addr);
 }
 
-// Initialize the random offset map (used before each benchmark iteration)
+/**
+ * Initialize random offset array for memory access patterns
+ * @return Array of random page offsets
+ */
 inline int* init_offsets() {
     int* offsets = (int*)malloc(OFFSET_COUNT * sizeof(int));
     if (!offsets) {
@@ -57,14 +76,20 @@ inline int* init_offsets() {
 }
 
 //======================================
-// Allocation
+// Memory Allocation
 //======================================
 
-// Allocate memory pages on DRAM
-// size: size of each page (e.g., PAGE_SIZE)
-// number: number of pages to allocate
+/**
+ * Allocate memory pages on DRAM
+ * @param size Size of each page
+ * @param number Number of pages to allocate
+ * @return Pointer to allocated memory
+ */
 inline void* allocate_pages(size_t size, size_t number) {
-    void* mem = mmap(NULL, size * number, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_POPULATE, -1, 0);
+    void* mem = mmap(NULL, size * number,
+        PROT_READ | PROT_WRITE,
+        MAP_PRIVATE | MAP_ANONYMOUS | MAP_POPULATE,
+        -1, 0);
     if (mem == MAP_FAILED) {
         perror("mmap failed");
         exit(EXIT_FAILURE);
@@ -72,28 +97,36 @@ inline void* allocate_pages(size_t size, size_t number) {
     return mem;
 }
 
-// Allocate pages on PMEM
-// size: size of each page
-// number: number of pages to allocate
-// numa_node: numa_node to allocate the page
+/**
+ * Allocate and bind memory pages to specific NUMA node
+ * @param size Size of each page
+ * @param number Number of pages to allocate
+ * @param numa_node Target NUMA node
+ * @return Pointer to allocated memory
+ */
 inline void* allocate_and_bind_to_numa(size_t size, size_t number, int numa_node) {
-    // Step 1: Allocate memory using mmap
-    void* addr = mmap(NULL, size * number, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    // Allocate memory
+    void* addr = mmap(NULL, size * number,
+        PROT_READ | PROT_WRITE,
+        MAP_PRIVATE | MAP_ANONYMOUS,
+        -1, 0);
     if (addr == MAP_FAILED) {
         perror("mmap failed");
         return NULL;
     }
-    // Step 2: Define the nodemask for the target NUMA node
+
+    // Bind to NUMA node
     unsigned long nodemask = (1UL << numa_node);
-    // Step 3: Directly call the mbind syscall to bind memory to the NUMA node
-    if (syscall(SYS_mbind, addr, size, MPOL_BIND, &nodemask, sizeof(nodemask) * 8, MPOL_MF_MOVE | MPOL_MF_STRICT) != 0) {
+    if (syscall(SYS_mbind, addr, size, MPOL_BIND,
+        &nodemask, sizeof(nodemask) * 8,
+        MPOL_MF_MOVE | MPOL_MF_STRICT) != 0) {
         perror("mbind syscall failed");
         munmap(addr, size * number);
         return NULL;
     }
 
-    // Step 4: Access (touch) the memory to ensure physical allocation
-    memset(addr, 0, size * number); // Initialize all memory to zero
+    // Initialize memory
+    memset(addr, 0, size * number);
     return addr;
 }
 
@@ -101,9 +134,11 @@ inline void* allocate_and_bind_to_numa(size_t size, size_t number, int numa_node
 // Page Migration
 //======================================
 
-// Move a single page to another NUMA node
-// addr: address of the page start
-// target_node: target NUMA node
+/**
+ * Move a single page to specified NUMA node
+ * @param addr Page address
+ * @param target_node Target NUMA node
+ */
 inline void move_page_to_node(void* addr, int target_node) {
     void* pages[1] = { addr };
     int nodes[1] = { target_node };
@@ -115,11 +150,13 @@ inline void move_page_to_node(void* addr, int target_node) {
     }
 }
 
-// Move multiple pages starting from 'addr' to another NUMA node
-// addr: starting address of pages
-// size: size of each page (e.g., PAGE_SIZE)
-// number: number of pages to move
-// target_node: target NUMA node
+/**
+ * Move multiple pages to specified NUMA node
+ * @param addr Starting address of pages
+ * @param size Size of each page
+ * @param number Number of pages to move
+ * @param target_node Target NUMA node
+ */
 inline void move_pages_to_node(void* addr, size_t size, size_t number, int target_node) {
     void** pages = (void**)malloc(number * sizeof(void*));
     int* nodes = (int*)malloc(number * sizeof(int));
@@ -132,13 +169,13 @@ inline void move_pages_to_node(void* addr, size_t size, size_t number, int targe
         exit(EXIT_FAILURE);
     }
 
-    // Populate pages array and nodes array
+    // Setup page and node arrays
     for (size_t i = 0; i < number; i++) {
-        pages[i] = (char*)addr + i * size; // Calculate the address of each page
-        nodes[i] = target_node;           // Set target node for each page
+        pages[i] = (char*)addr + i * size;
+        nodes[i] = target_node;
     }
 
-    // Move pages
+    // Perform migration
     if (syscall(SYS_move_pages, 0, number, pages, nodes, status, MPOL_MF_MOVE) != 0) {
         perror("move_pages failed");
         free(pages);
@@ -147,7 +184,7 @@ inline void move_pages_to_node(void* addr, size_t size, size_t number, int targe
         exit(EXIT_FAILURE);
     }
 
-    // Check the status array for results
+    // Check migration status
     for (size_t i = 0; i < number; i++) {
         if (status[i] < 0) {
             fprintf(stderr, "Failed to move page %zu: error code %d\n", i, status[i]);
@@ -159,29 +196,36 @@ inline void move_pages_to_node(void* addr, size_t size, size_t number, int targe
     free(status);
 }
 
-// Migrate one page from one tier to another
+/**
+ * Migrate a page between memory tiers
+ * @param addr Page address
+ * @param current_tier Current memory tier
+ * @param target_tier Target memory tier
+ */
 inline void migrate_page(void* addr, PageLayer current_tier, PageLayer target_tier) {
-
     int target_node = (target_tier == PageLayer::NUMA_LOCAL) ? 0 :
         (target_tier == PageLayer::NUMA_REMOTE) ? 1 : 2;
     move_page_to_node(addr, target_node);
-
 }
 
 //======================================
-// Memory Access
+// Memory Access Operations
 //======================================
 
-// Access the specified memory page
+/**
+ * Access a specific memory page
+ * @param addr Page address
+ * @param mode Memory access mode (read/write)
+ * @return Access time in nanoseconds
+ */
 inline uint64_t access_page(void* addr, mem_access_mode mode) {
     volatile uint64_t* page = (volatile uint64_t*)addr;
     uint64_t start_time = get_time_ns();
 
     flush_cache(addr);
     uint64_t value_1, value_2 = 44;
-    // Perform a simple read/write operation
-    switch (mode)
-    {
+
+    switch (mode) {
     case READ:
         memcpy(&value_1, (const void*)&page, sizeof(uint64_t));
         break;
@@ -195,7 +239,13 @@ inline uint64_t access_page(void* addr, mem_access_mode mode) {
     return (get_time_ns() - start_time);
 }
 
-// Access the random memory and measure the time taken
+/**
+ * Access random memory pages and measure time
+ * @param addr Base address
+ * @param offsets Array of random offsets
+ * @param mode Memory access mode
+ * @return Total access time in nanoseconds
+ */
 inline uint64_t access_random_page(void* addr, int* offsets, mem_access_mode mode) {
     volatile uint64_t* page = (volatile uint64_t*)addr;
     uint64_t start_time = get_time_ns();
@@ -204,9 +254,8 @@ inline uint64_t access_random_page(void* addr, int* offsets, mem_access_mode mod
         flush_cache(addr);
         int offset = offsets[i];
         uint64_t value_1, value_2 = 44;
-        // Perform a simple read/write operation
-        switch (mode)
-        {
+
+        switch (mode) {
         case READ:
             memcpy(&value_1, (const void*)&page[offset], sizeof(uint64_t));
             break;

@@ -60,6 +60,11 @@ struct ServerMemoryConfig {
     size_t pmem_size;         // Size of persistent memory
 };
 
+struct PolicyConfig {
+    size_t hot_access_cnt;
+    size_t cold_access_interval;
+};
+
 /**
  * Generates memory access patterns according to specified distribution
  */

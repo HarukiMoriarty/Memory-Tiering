@@ -24,7 +24,8 @@ int main(int argc, char* argv[]) {
 
     RingBuffer<MemMoveReq> move_page_buffer(config.getBufferSize());
     ServerMemoryConfig server_config = config.getServerMemoryConfig();
-    Server server(client_req_buffer, move_page_buffer, memory_sizes, server_config);
+    PolicyConfig policy_config = config.getPolicyConfig();
+    Server server(client_req_buffer, move_page_buffer, memory_sizes, server_config, policy_config);
 
     std::vector<std::shared_ptr<Client>> clients;
     std::vector<boost::thread> client_threads;
