@@ -85,6 +85,9 @@ void PageTable::initPageTable(const std::vector<int>& client_memory_sizes, const
     // then client 2, etc.
 
     size_t current_index = 0;
+    size_t local_offset_pages = 0;
+    size_t remote_offset_pages = 0;
+    size_t pmem_offset_pages = 0;
 
     auto fillPages = [&](PageLayer layer, size_t count, void* base, size_t& offset) {
         for (size_t i = 0; i < count; ++i) {
