@@ -5,8 +5,10 @@
 #include "RingBuffer.hpp"
 #include "ConfigParser.hpp"
 #include "Common.hpp"
+#include "Logger.hpp"
 
 int main(int argc, char* argv[]) {
+    Logger::getInstance().init();
     ConfigParser config;
 
     if (!config.parse(argc, argv)) {
@@ -14,10 +16,10 @@ int main(int argc, char* argv[]) {
     }
 
     RingBuffer<ClientMessage> client_req_buffer(config.getBufferSize());
-    std::vector<int> memory_sizes;
+    std::vector<size_t> memory_sizes;
     const auto& client_configs = config.getClientConfigs();
     for (const auto& client_config : client_configs) {
-        memory_sizes.push_back(client_config.memory_size);
+        memory_sizes.push_back(client_config.addr_space_size);
     }
 
     RingBuffer<MemMoveReq> move_page_buffer(config.getBufferSize());
@@ -32,7 +34,7 @@ int main(int argc, char* argv[]) {
             client_req_buffer,
             i,
             config.getMessageCount(),
-            client_config.memory_size,
+            client_config.addr_space_size,
             client_config.pattern
         );
         clients.push_back(client);

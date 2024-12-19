@@ -1,6 +1,6 @@
 CXX = g++
-CXXFLAGS = -Iinclude -Wall -std=c++17 -pthread
-LDFLAGS = -lboost_system -lboost_thread -lboost_chrono
+CXXFLAGS = -Iinclude -Wall -std=c++17 -pthread -DBOOST_LOG_DYN_LINK
+LDFLAGS = -lboost_log_setup -lboost_log -lboost_filesystem -lboost_thread -lboost_system -lboost_chrono -lpthread
 
 SRC_DIR = src
 BUILD_DIR = build
@@ -9,7 +9,7 @@ SRC = $(wildcard $(SRC_DIR)/*.cpp) main.cpp
 OBJ = $(patsubst %.cpp,$(OBJ_DIR)/%.o,$(notdir $(SRC)))
 TARGET = $(BUILD_DIR)/main
 
-all: $(TARGET)
+all: clean $(TARGET)
 
 $(TARGET): $(OBJ)
 	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS)

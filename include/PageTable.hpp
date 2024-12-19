@@ -12,21 +12,20 @@
 struct PageMetadata {
     void* page_address;
     PageLayer page_layer;
-    int page_id;
     std::chrono::steady_clock::time_point last_access_time;
     size_t access_count = 0;
 
-    PageMetadata(void* addr = 0, PageLayer layer = PageLayer::NUMA_LOCAL, int id = 0);
+    PageMetadata(void* addr = 0, PageLayer layer = PageLayer::NUMA_LOCAL);
 };
 
 class PageTable {
 public:
     PageTable(size_t size);
-    void initPageTable(const std::vector<int>& client_memory_sizes, const ServerMemoryConfig& server_config,
-                    void* local_base, void* remote_base, void* pmem_base);
+    void initPageTable(const std::vector<size_t>& client_addr_space, const ServerMemoryConfig& server_config, void* local_base, void* remote_base, void* pmem_base);
 
     // Read-only operations
     PageMetadata getPage(size_t index) const;
+    size_t getNextPageId() const;
     size_t size() const;
 
     // Write operations  
