@@ -23,6 +23,9 @@ Server::Server(RingBuffer<ClientMessage>& client_buffer, RingBuffer<MemMoveReq>&
     // Allocate memory based on the server config
     allocateMemory(server_config);
 
+    // After allocating memory, generate random content in all tiers
+    generateRandomContent();
+
     // Init page table of all memory tiers
     page_table_->initPageTable(client_addr_space, server_config, local_base_, remote_base_, pmem_base_);
 }
@@ -53,6 +56,43 @@ void Server::allocateMemory(const ServerMemoryConfig& config) {
 
     // Allocate PMEM pages
     pmem_base_ = allocate_and_bind_to_numa(PAGE_SIZE, local_page_count_, 2);
+}
+
+void Server::generateRandomContent() {
+    // Seed the random number generator
+    srand(static_cast<unsigned>(time(NULL)));
+
+    size_t local_size = local_page_count_ * PAGE_SIZE;
+    size_t remote_size = remote_page_count_ * PAGE_SIZE;
+    size_t pmem_size = pmem_page_count_ * PAGE_SIZE;
+
+    // Fill local tier
+    {
+        unsigned char* base = static_cast<unsigned char*>(local_base_);
+        for (size_t i = 0; i < local_size; i++) {
+            base[i] = static_cast<unsigned char>(rand() % 256);
+        }
+    }
+    LOG_DEBUG("Random content generated for local numa node.");
+
+    // Fill remote tier
+    {
+        unsigned char* base = static_cast<unsigned char*>(remote_base_);
+        for (size_t i = 0; i < remote_size; i++) {
+            base[i] = static_cast<unsigned char>(rand() % 256);
+        }
+    }
+    LOG_DEBUG("Random content generated for remote numa node.");
+
+    // Fill pmem tier
+    {
+        unsigned char* base = static_cast<unsigned char*>(pmem_base_);
+        for (size_t i = 0; i < pmem_size; i++) {
+            base[i] = static_cast<unsigned char>(rand() % 256);
+        }
+    }
+
+    LOG_DEBUG("Random content generated for persistent memory.");
 }
 
 // Helper function to handle a ClientMessage

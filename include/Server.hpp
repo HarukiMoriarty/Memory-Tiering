@@ -16,6 +16,7 @@ public:
     ~Server();
     // Allocates memory in all three tiers and stores base addresses
     void allocateMemory(const ServerMemoryConfig& config);
+    void generateRandomContent();
     void handleClientMessage(const ClientMessage& msg);
     void handleMemoryMoveRequest(const MemMoveReq& req);
     void runManagerThread();
