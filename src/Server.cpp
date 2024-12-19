@@ -52,10 +52,10 @@ void Server::allocateMemory(const ServerMemoryConfig& config) {
     local_base_ = allocate_pages(PAGE_SIZE, local_page_count_);
 
     // Allocate memory for remote NUMA pages 
-    remote_base_ = allocate_and_bind_to_numa(PAGE_SIZE, local_page_count_, 1);
+    remote_base_ = allocate_and_bind_to_numa(PAGE_SIZE, remote_page_count_, 1);
 
     // Allocate PMEM pages
-    pmem_base_ = allocate_and_bind_to_numa(PAGE_SIZE, local_page_count_, 2);
+    pmem_base_ = allocate_and_bind_to_numa(PAGE_SIZE, pmem_page_count_, 2);
 }
 
 void Server::generateRandomContent() {
@@ -65,6 +65,10 @@ void Server::generateRandomContent() {
     size_t local_size = local_page_count_ * PAGE_SIZE;
     size_t remote_size = remote_page_count_ * PAGE_SIZE;
     size_t pmem_size = pmem_page_count_ * PAGE_SIZE;
+
+    LOG_DEBUG("Local size: " << local_size);
+    LOG_DEBUG("Remote size: " << remote_size);
+    LOG_DEBUG("PMEM size: " << pmem_size);
 
     // Fill local tier
     {
@@ -180,9 +184,9 @@ void Server::runPolicyThread() {
 // Main function to start threads
 void Server::start() {
     boost::thread server_thread(&Server::runManagerThread, this);
-    // boost::thread policy_thread(&Server::runPolicyThread, this);
+    boost::thread policy_thread(&Server::runPolicyThread, this);
 
     // Join threads
     server_thread.join();
-    // policy_thread.join();
+    policy_thread.join();
 }
