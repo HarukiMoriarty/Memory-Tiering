@@ -23,7 +23,7 @@
 #define ITERATIONS 1     
 #define OFFSET_COUNT 100000
 
-typedef enum  {
+typedef enum {
     READ = 0,
     WRITE = 1,
     READ_WRITE = 2,
@@ -88,7 +88,7 @@ inline void* allocate_and_bind_to_numa(size_t size, size_t number, int numa_node
     // Step 3: Directly call the mbind syscall to bind memory to the NUMA node
     if (syscall(SYS_mbind, addr, size, MPOL_BIND, &nodemask, sizeof(nodemask) * 8, MPOL_MF_MOVE | MPOL_MF_STRICT) != 0) {
         perror("mbind syscall failed");
-        munmap(addr, size*number);
+        munmap(addr, size * number);
         return NULL;
     }
 
@@ -163,9 +163,9 @@ inline void move_pages_to_node(void* addr, size_t size, size_t number, int targe
 inline void migrate_page(void* addr, PageLayer current_tier, PageLayer target_tier) {
 
     int target_node = (target_tier == PageLayer::NUMA_LOCAL) ? 0 :
-                  (target_tier == PageLayer::NUMA_REMOTE) ? 1 : 2;
+        (target_tier == PageLayer::NUMA_REMOTE) ? 1 : 2;
     move_page_to_node(addr, target_node);
-  
+
 }
 
 //======================================
@@ -192,7 +192,7 @@ inline uint64_t access_page(void* addr, mem_access_mode mode) {
         break;
     }
 
-    return (get_time_ns() - start_time)/OFFSET_COUNT;
+    return (get_time_ns() - start_time);
 }
 
 // Access the random memory and measure the time taken
@@ -218,7 +218,7 @@ inline uint64_t access_random_page(void* addr, int* offsets, mem_access_mode mod
         }
     }
 
-    return (get_time_ns() - start_time)/OFFSET_COUNT;
+    return (get_time_ns() - start_time);
 }
 
 #endif // UTILS_HPP
