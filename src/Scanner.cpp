@@ -1,5 +1,6 @@
 #include "Scanner.hpp"
 #include "Logger.hpp"
+#include "Server.hpp"
 
 #include <iostream>
 #include <boost/chrono.hpp>
@@ -23,9 +24,9 @@ bool Scanner::classifyColdPage(const PageMetadata& page, boost::chrono::millisec
 }
 
 // Continuously classify pages using scanNext()
-void Scanner::runClassifier(RingBuffer<MemMoveReq>& move_page_buffer, size_t min_access_count, boost::chrono::milliseconds time_threshold) {
+void Scanner::runClassifier(RingBuffer<MemMoveReq>& move_page_buffer, size_t min_access_count, boost::chrono::milliseconds time_threshold, Server& server) {
     running_ = true;
-    while (running_) {
+    while (running_ && !server.shouldShutdown()) {
         size_t page_id = page_table_.getNextPageId();
         PageMetadata page = page_table_.scanNext();
 

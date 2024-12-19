@@ -11,6 +11,7 @@
 enum class OperationType {
     READ,   // Read operation
     WRITE,  // Write operation
+    END //Ene operation
 };
 
 /**

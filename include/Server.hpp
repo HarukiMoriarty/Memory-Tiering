@@ -8,6 +8,8 @@
 #include "Scanner.hpp"
 #include "Common.hpp"
 #include "Utils.hpp"
+#include <boost/thread/mutex.hpp>
+#include <boost/thread/lock_guard.hpp>
 
 class Server {
 public:
@@ -22,6 +24,9 @@ public:
     void runManagerThread();
     void runPolicyThread();
     void start();
+    
+    void signalShutdown();                // Sets the shutdown flag
+    bool shouldShutdown();                // Checks the shutdown flag
 
 private:
     RingBuffer<ClientMessage>& client_buffer_;
@@ -31,6 +36,7 @@ private:
     Scanner* scanner_;
     ServerMemoryConfig server_config_;
     PolicyConfig policy_config_;
+    std::vector<bool> client_done_flags_;
 
     // Number of pages in each tier, stored for convenience
     size_t local_page_count_ = 0;
@@ -40,6 +46,10 @@ private:
     void* local_base_ = nullptr;
     void* remote_base_ = nullptr;
     void* pmem_base_ = nullptr;
+
+    bool shutdown_flag_ = false;           // Shared shutdown flag
+    boost::mutex shutdown_mutex_;           // Protects the flag
+
 };
 
 #endif // SERVER_H

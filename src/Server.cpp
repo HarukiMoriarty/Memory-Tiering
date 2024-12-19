@@ -16,6 +16,9 @@ Server::Server(RingBuffer<ClientMessage>& client_buffer, RingBuffer<MemMoveReq>&
         current_base += size;
     }
 
+    // Initialize flags for each client
+    client_done_flags_ = std::vector<bool>(client_addr_space.size(), false);
+
     // Init PageTable with the total memory size
     page_table_ = new PageTable(current_base);
     scanner_ = new Scanner(*page_table_);
@@ -103,6 +106,19 @@ void Server::generateRandomContent() {
 void Server::handleClientMessage(const ClientMessage& msg) {
     LOG_DEBUG("Server received: " << msg.toString());
 
+    if (msg.op_type == OperationType::END) {
+        client_done_flags_[msg.client_id] = true;
+        LOG_DEBUG("Client " << msg.client_id << " sent END command.");
+
+        // Check if all clients are done
+        if (std::all_of(client_done_flags_.begin(), client_done_flags_.end(), [](bool done) { return done; })) {
+            LOG_INFO("All clients sent END command. Printing metrics...");
+            Metrics::getInstance().printMetrics();
+            signalShutdown();  // Exit the server gracefully
+        }
+        return;
+    }
+
     size_t actual_id = base_page_id_[msg.client_id] + msg.offset;
     size_t page_id = static_cast<size_t>(actual_id);
     PageMetadata page_meta = page_table_->getPage(actual_id);
@@ -171,7 +187,7 @@ void Server::handleMemoryMoveRequest(const MemMoveReq& req) {
 }
 
 void Server::runManagerThread() {
-    while (true) {
+    while (!shouldShutdown()) {
         ClientMessage client_msg(0, 0, OperationType::READ);
         MemMoveReq move_msg(0, PageLayer::NUMA_LOCAL);
 
@@ -190,12 +206,25 @@ void Server::runManagerThread() {
             // boost::this_thread::sleep_for(boost::chrono::milliseconds(100));
         }
     }
+    LOG_DEBUG("Manager thread exiting...");
 }
 
 // Policy thread logic
 void Server::runPolicyThread() {
+  
     // Pre-defined thresholds
-    scanner_->runClassifier(move_page_buffer_, policy_config_.hot_access_cnt, boost::chrono::milliseconds(policy_config_.cold_access_interval));
+    scanner_->runClassifier(move_page_buffer_, policy_config_.hot_access_cnt, boost::chrono::milliseconds(policy_config_.cold_access_interval), *this);
+    LOG_DEBUG("Policy thread exiting...");
+}
+
+void Server::signalShutdown() {
+    boost::lock_guard<boost::mutex> lock(shutdown_mutex_);
+    shutdown_flag_ = true;
+}
+
+bool Server::shouldShutdown() {
+    boost::lock_guard<boost::mutex> lock(shutdown_mutex_);
+    return shutdown_flag_;
 }
 
 // Main function to start threads
@@ -207,6 +236,5 @@ void Server::start() {
     server_thread.join();
     policy_thread.join();
 
-    // Print metrics
-    Metrics::getInstance().printMetrics();
+    LOG_INFO("All threads exited. Server shutdown complete.");
 }

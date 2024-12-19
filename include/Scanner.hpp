@@ -7,6 +7,8 @@
 
 #include <chrono>
 
+class Server;
+
 class Scanner {
 private:
     PageTable& page_table_;
@@ -23,7 +25,7 @@ public:
     bool classifyColdPage(const PageMetadata& page, boost::chrono::milliseconds time_threshold) const;
 
     // Continuously classify pages using scanNext()
-    void runClassifier(RingBuffer<MemMoveReq>& move_page_buffer, size_t min_access_count, boost::chrono::milliseconds time_threshold);
+    void runClassifier(RingBuffer<MemMoveReq>& move_page_buffer, size_t min_access_count, boost::chrono::milliseconds time_threshold, Server& server);
 
     // Stop the continuous classifier
     void stopClassifier();

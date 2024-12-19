@@ -24,4 +24,10 @@ void Client::run() {
 
         LOG_DEBUG("Client sent: " << msg.toString());
     }
+
+    ClientMessage end_msg(client_id_, 0, OperationType::END); 
+    while (!buffer_.push(end_msg)) {
+        boost::this_thread::sleep_for(boost::chrono::nanoseconds(100));
+    }
+    LOG_DEBUG("Client sent END message.");
 }
