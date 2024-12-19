@@ -35,16 +35,16 @@ The client partition of numa remote pages is
 To start the evaluation, run the following command:
 
 ```bash
-make clean
-make
-
-./build/main -p uniform,skewed,uniform -s 1000,2000,1500 -b 100 -m 1000 -c 1280,5120,21480
+$ make
+$ LOG_LEVEL=info ./build/main -p uniform,skewed,uniform -c 1000,2000,1500 -b 100 -m 1000 -s 1280,5120,21480 --hot-access-cnt 10 --cold-access-interval 1000
 ```
 
 Where:
 - `-p`, `--patterns`: Memory access patterns for each client (uniform/skewed)
-- `-s`, `--sizes`: Memory space size for each client
+- `-s`, `--sizes`: Address space size for each client
 - `-b`, `--buffer-size`: Size of ring buffer
 - `-m`, `--messages`: Number of messages per client
-- `-c`, `--server`: Memory configuration for server
+- `-c`, `--server`: Memory configuration for each tiering
 - `-h`, `--help`: Print usage information
+- `--hot-access-cnt`: Hot access cnt for promote a page
+- `--cold-access-interval`: Cold access cnt for demote a page
