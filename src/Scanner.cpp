@@ -74,8 +74,11 @@ void Scanner::runClassifier(RingBuffer<MemMoveReq>& move_page_buffer, size_t min
         }
         }
 
-        // Sleep for a short duration to prevent tight loop
-        boost::this_thread::sleep_for(boost::chrono::milliseconds(10));
+        // Sleep for a short duration after whole table iteration
+        if (page_id == page_table_.size() - 1) {
+            boost::this_thread::sleep_for(boost::chrono::milliseconds(10));
+            LOG_DEBUG("Finished scanning all pages in one round!");
+        }
     }
 }
 
