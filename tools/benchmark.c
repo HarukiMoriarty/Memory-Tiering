@@ -236,7 +236,7 @@ int main() {
 
     // Allocate a DRAM page and measure the allocation time
     uint64_t start_time = get_time_ns();
-    void* dram_page = allocate_pages(PAGE_SIZE, PAGE_NUM);
+    void* dram_page = allocate_and_bind_to_numa(PAGE_SIZE, PAGE_NUM, 0);
     uint64_t alloc_time = get_time_ns() - start_time;
     total_alloc_time += alloc_time;
 
@@ -263,7 +263,7 @@ int main() {
     // Cleanup DRAM page
     munmap(dram_page, PAGE_SIZE*PAGE_NUM);
 
-    dram_page = allocate_pages(PAGE_SIZE, PAGE_NUM);
+    dram_page =  allocate_and_bind_to_numa(PAGE_SIZE, PAGE_NUM, 0);
     // Also move the page from Local DRAM to PMEM
     start_time = get_time_ns();
     move_pages_to_node(dram_page, PAGE_SIZE, PAGE_NUM, 2); // Move to NUMA node 2

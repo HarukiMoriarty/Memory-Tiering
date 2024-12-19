@@ -52,7 +52,7 @@ void Server::allocateMemory(const ServerMemoryConfig& config) {
     pmem_page_count_ = config.pmem_size;
 
     // Allocate local NUMA memory
-    local_base_ = allocate_pages(PAGE_SIZE, local_page_count_);
+    local_base_ = allocate_and_bind_to_numa(PAGE_SIZE, local_page_count_, 0);
 
     // Allocate memory for remote NUMA pages 
     remote_base_ = allocate_and_bind_to_numa(PAGE_SIZE, remote_page_count_, 1);
