@@ -73,7 +73,7 @@ void* allocate_and_bind_to_numa(size_t size, size_t number, int numa_node) {
     // Step 3: Directly call the mbind syscall to bind memory to the NUMA node
     if (syscall(SYS_mbind, addr, size, MPOL_BIND, &nodemask, sizeof(nodemask) * 8, MPOL_MF_MOVE | MPOL_MF_STRICT) != 0) {
         perror("mbind syscall failed");
-        munmap(addr, size);
+        munmap(addr, size*number);
         return NULL;
     }
 
