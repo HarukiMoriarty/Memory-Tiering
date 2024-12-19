@@ -9,10 +9,11 @@ void Metrics::printMetricsThreeTiers() const {
     LOG_INFO("  PMEM:        " << pmem_access_count_.load());
 
     LOG_INFO("Access Latency (ns):");
-    LOG_INFO("  Min: " << acc::min(access_latency_));
-    LOG_INFO("  P50: " << acc::extended_p_square(access_latency_)[1]);  // 50th percentile
-    LOG_INFO("  P99: " << acc::extended_p_square(access_latency_)[2]);  // 99th percentile
-    LOG_INFO("  Max: " << acc::max(access_latency_));
+    LOG_INFO("  Min:  " << acc::min(access_latency_));
+    LOG_INFO("  P50:  " << acc::extended_p_square(access_latency_)[1]);  // 50th percentile
+    LOG_INFO("  P99:  " << acc::extended_p_square(access_latency_)[2]);  // 99th percentile
+    LOG_INFO("  Max:  " << acc::max(access_latency_));
+    LOG_INFO("  Mean: " << acc::mean(access_latency_));
 
     LOG_INFO("Migration Counts:");
     LOG_INFO("  Local -> Remote: " << local_to_remote_count_.load());
@@ -23,10 +24,11 @@ void Metrics::printMetricsThreeTiers() const {
     LOG_INFO("  PMEM -> Local: " << pmem_to_local_count_.load());
 
     LOG_INFO("Migration Latency (ns):");
-    LOG_INFO("  Min: " << acc::min(migration_latency_));  // Fixed: was using access_latency_
-    LOG_INFO("  P50: " << acc::extended_p_square(migration_latency_)[1]);  // Fixed: was using access_latency_
-    LOG_INFO("  P99: " << acc::extended_p_square(migration_latency_)[2]);  // Fixed: was using access_latency_
-    LOG_INFO("  Max: " << acc::max(migration_latency_));
+    LOG_INFO("  Min:  " << acc::min(migration_latency_));  // Fixed: was using access_latency_
+    LOG_INFO("  P50:  " << acc::extended_p_square(migration_latency_)[1]);  // Fixed: was using access_latency_
+    LOG_INFO("  P99:  " << acc::extended_p_square(migration_latency_)[2]);  // Fixed: was using access_latency_
+    LOG_INFO("  Max:  " << acc::max(migration_latency_));
+    LOG_INFO("  Mean: " << acc::mean(migration_latency_));
 
     if (total_latency_.load() > 0) {
         LOG_INFO("Throughput:");
@@ -44,20 +46,22 @@ void Metrics::printMetricsTwoTiers() const {
     LOG_INFO("  PMEM: " << pmem_access_count_.load());
 
     LOG_INFO("Access Latency (ns):");
-    LOG_INFO("  Min: " << acc::min(access_latency_));
-    LOG_INFO("  P50: " << acc::extended_p_square(access_latency_)[1]);
-    LOG_INFO("  P99: " << acc::extended_p_square(access_latency_)[2]);
-    LOG_INFO("  Max: " << acc::max(access_latency_));
+    LOG_INFO("  Min:  " << acc::min(access_latency_));
+    LOG_INFO("  P50:  " << acc::extended_p_square(access_latency_)[1]);
+    LOG_INFO("  P99:  " << acc::extended_p_square(access_latency_)[2]);
+    LOG_INFO("  Max:  " << acc::max(access_latency_));
+    LOG_INFO("  Mean: " << acc::mean(access_latency_));
 
     LOG_INFO("Migration Counts:");
     LOG_INFO("  DRAM -> PMEM: " << local_to_pmem_count_.load());
     LOG_INFO("  PMEM -> DRAM: " << pmem_to_local_count_.load());
 
     LOG_INFO("Migration Latency (ns):");
-    LOG_INFO("  Min: " << acc::min(migration_latency_));
-    LOG_INFO("  P50: " << acc::extended_p_square(migration_latency_)[1]);
-    LOG_INFO("  P99: " << acc::extended_p_square(migration_latency_)[2]);
-    LOG_INFO("  Max: " << acc::max(migration_latency_));
+    LOG_INFO("  Min:  " << acc::min(migration_latency_));
+    LOG_INFO("  P50:  " << acc::extended_p_square(migration_latency_)[1]);
+    LOG_INFO("  P99:  " << acc::extended_p_square(migration_latency_)[2]);
+    LOG_INFO("  Max:  " << acc::max(migration_latency_));
+    LOG_INFO("  Mean: " << acc::mean(migration_latency_));
 
     if (total_latency_.load() > 0) {
         LOG_INFO("Throughput:");

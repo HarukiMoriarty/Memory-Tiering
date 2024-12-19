@@ -80,6 +80,7 @@ private:
 
     using AccumulatorType = acc::accumulator_set<uint64_t,
         acc::stats<
+        acc::tag::mean,
         acc::tag::min,
         acc::tag::max,
         acc::tag::extended_p_square
