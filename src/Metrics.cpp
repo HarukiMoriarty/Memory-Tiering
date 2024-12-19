@@ -19,7 +19,7 @@ void Metrics::printMetrics() const {
 void Metrics::printMetricsTwoTiers() const {
     LOG_INFO("======== Memory Access Metrics (Two Tiers) ========");
     LOG_INFO("Access Counts:");
-    LOG_INFO("  DRAM: "  << (local_access_count_.load() + remote_access_count_.load()));
+    LOG_INFO("  DRAM: "  << (local_access_count_.load()));
     LOG_INFO("  PMEM: " << pmem_access_count_.load());
 
     LOG_INFO("Migration Counts:");

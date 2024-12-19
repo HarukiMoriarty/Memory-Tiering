@@ -90,15 +90,21 @@ bool ConfigParser::parse(int argc, char* argv[]) {
         return false;
     }
     // Expected order: local_numa_size, remote_numa_size, pmem_size
-    if (mem_sizes.size() != 3) {
-        LOG_ERROR("Error: Server configuration must have exactly three memory sizes");
+    if (mem_sizes.size() != num_tiers_) {
+        LOG_ERROR("Error: Server configuration must have exactly " << num_tiers_ << " memory sizes.");
         return false;
     }
 
     server_memory_config_.num_tiers = num_tiers_;
-    server_memory_config_.local_numa_size = mem_sizes[0];
-    server_memory_config_.remote_numa_size = mem_sizes[1];
-    server_memory_config_.pmem_size = mem_sizes[2];
+    server_memory_config_.local_numa_size = mem_sizes[0]; 
+    if (num_tiers_ == 2) {
+        server_memory_config_.remote_numa_size = 0;          
+        server_memory_config_.pmem_size = mem_sizes[1]; 
+    }
+    else{
+        server_memory_config_.remote_numa_size = mem_sizes[1];
+        server_memory_config_.pmem_size = mem_sizes[2];
+    }
 
     printConfig();
     return true;
@@ -125,7 +131,7 @@ void ConfigParser::printConfig() const {
     LOG_INFO("Memory Tier Sizes:");
    
     if (server_memory_config_.num_tiers == 2) {
-        LOG_INFO("  - DRAM: " << server_memory_config_.local_numa_size + server_memory_config_.remote_numa_size  << " pages");
+        LOG_INFO("  - DRAM: " << server_memory_config_.local_numa_size << " pages");
         LOG_INFO("  - PMEM: " << server_memory_config_.pmem_size << " pages");
     }
     if (server_memory_config_.num_tiers == 3 ) {
