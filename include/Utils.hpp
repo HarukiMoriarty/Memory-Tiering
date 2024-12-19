@@ -76,7 +76,7 @@ inline void* allocate_pages(size_t size, size_t number) {
 // size: size of each page
 // number: number of pages to allocate
 // numa_node: numa_node to allocate the page
-void* allocate_and_bind_to_numa(size_t size, size_t number, int numa_node) {
+inline void* allocate_and_bind_to_numa(size_t size, size_t number, int numa_node) {
     // Step 1: Allocate memory using mmap
     void* addr = mmap(NULL, size * number, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
     if (addr == MAP_FAILED) {
