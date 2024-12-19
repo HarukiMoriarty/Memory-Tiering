@@ -18,6 +18,49 @@ Server::Server(RingBuffer<ClientMessage>& client_buffer, RingBuffer<MemMoveReq>&
     page_table_ = new PageTable(current_base);
 
     scanner_ = new Scanner(*page_table_);
+
+    // Allocate memory based on the server config
+    allocateMemory(server_config);
+
+    // Init page table of all memory tiers
+    page_table_->initPageTable(client_memory_sizes, server_config, local_base_, remote_base_, pmem_base_);
+}
+
+Server::~Server() {
+    if (local_base_) {
+        munmap(local_base_, local_page_count_ * PAGE_SIZE);
+    }
+    if (remote_base_) {
+        munmap(remote_base_, remote_page_count_ * PAGE_SIZE);
+    }
+    if (pmem_base_) {
+        munmap(pmem_base_, pmem_page_count_ * PAGE_SIZE);
+    }
+}
+
+void Server::allocateMemory(const ServerMemoryConfig& config) {
+    // Store counts
+    local_page_count_ = config.local_numa_size;
+    remote_page_count_ = config.remote_numa_size;
+    pmem_page_count_ = config.pmem_size;
+
+    // Allocate local NUMA memory
+    local_base_ = allocate_pages(PAGE_SIZE, local_page_count_);
+
+    // TODO: Allocate memory for remote NUMA pages 
+    // (allocate locally first)
+    remote_base_ = allocate_pages(PAGE_SIZE, remote_page_count_);
+    // Move these pages to another NUMA node, e.g., node 1
+    move_pages_to_node(remote_base_, PAGE_SIZE, remote_page_count_, 1);
+
+    // TODO: Allocate PMEM pages
+    int fd = open(PMEM_FILE, O_RDWR, 0666);
+    if (fd < 0) {
+        perror("open PMEM file failed");
+        exit(EXIT_FAILURE);
+    }
+    pmem_base_ = allocate_pmem_pages(fd, PAGE_SIZE, pmem_page_count_);
+    close(fd);
 }
 
 // Helper function to handle a ClientMessage
