@@ -1,6 +1,6 @@
 #include "Server.hpp"
-#include "Common.hpp"
 #include "Logger.hpp"
+#include "Metrics.hpp"
 
 #include <iostream>
 #include <boost/chrono.hpp>
@@ -102,21 +102,31 @@ void Server::generateRandomContent() {
 // Helper function to handle a ClientMessage
 void Server::handleClientMessage(const ClientMessage& msg) {
     LOG_DEBUG("Server received: " << msg.toString());
-    size_t actual_id = base_page_id_[msg.client_id] + msg.offset;
 
-    // Update access info in PageTable (assume address maps directly to a page_id)
+    size_t actual_id = base_page_id_[msg.client_id] + msg.offset;
     size_t page_id = static_cast<size_t>(actual_id);
-    void* actual_address = page_table_->getPage(actual_id).page_address;
+    PageMetadata page_meta = page_table_->getPage(actual_id);
     page_table_->updateAccess(page_id);
 
+    switch (page_meta.page_layer) {
+    case PageLayer::NUMA_LOCAL:
+        Metrics::getInstance().incrementLocalAccess();
+        break;
+    case PageLayer::NUMA_REMOTE:
+        Metrics::getInstance().incrementRemoteAccess();
+        break;
+    case PageLayer::PMEM:
+        Metrics::getInstance().incrementPmemAccess();
+        break;
+    }
+
     // record access latency
-    // TODO: notice we need actual transfer address
     uint64_t access_time;
     if (msg.op_type == OperationType::READ) {
-        access_time = access_page(actual_address, READ);
+        access_time = access_page(page_meta.page_address, READ);
     }
     else {
-        access_time = access_page(actual_address, WRITE);
+        access_time = access_page(page_meta.page_address, WRITE);
     }
     LOG_DEBUG("Access time: " << access_time << " ns");
 }
@@ -137,10 +147,21 @@ void Server::handleMemoryMoveRequest(const MemMoveReq& req) {
         return;
     }
 
+    if (current_node == PageLayer::NUMA_LOCAL && target_node == PageLayer::NUMA_REMOTE) {
+        Metrics::getInstance().incrementLocalToRemote();
+    }
+    else if (current_node == PageLayer::NUMA_REMOTE && target_node == PageLayer::NUMA_LOCAL) {
+        Metrics::getInstance().incrementRemoteToLocal();
+    }
+    else if (current_node == PageLayer::PMEM && target_node == PageLayer::NUMA_REMOTE) {
+        Metrics::getInstance().incrementPmemToRemote();
+    }
+    else if (current_node == PageLayer::NUMA_REMOTE && target_node == PageLayer::PMEM) {
+        Metrics::getInstance().incrementRemoteToPmem();
+    }
+
     // Perform the page migration
-    LOG_DEBUG("Moving Page " << page_id
-        << " from Node " << current_node
-        << " to Node " << target_node << "...");
+    LOG_DEBUG("Moving Page " << page_id << " from Node " << current_node << " to Node " << target_node << "...");
     migrate_page(page_meta.page_address, current_node, target_node);
 
     // After the move, update the page layer in the PageTable
@@ -185,4 +206,7 @@ void Server::start() {
     // Join threads
     server_thread.join();
     policy_thread.join();
+
+    // Print metrics
+    Metrics::getInstance().printMetrics();
 }

@@ -47,4 +47,4 @@ Where:
 - `-c`, `--server`: Memory configuration for each tiering
 - `-h`, `--help`: Print usage information
 - `--hot-access-cnt`: Hot access cnt for promote a page
-- `--cold-access-interval`: Cold access cnt for demote a page
+- `--cold-access-interval`: Cold access interval for demote a page
