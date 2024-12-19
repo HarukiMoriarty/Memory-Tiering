@@ -5,8 +5,10 @@
 #include "RingBuffer.hpp"
 #include "ConfigParser.hpp"
 #include "Common.hpp"
+#include "Logger.hpp"
 
 int main(int argc, char* argv[]) {
+    Logger::getInstance().init();
     ConfigParser config;
 
     if (!config.parse(argc, argv)) {

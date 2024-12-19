@@ -1,6 +1,6 @@
 CXX = g++
-CXXFLAGS = -Iinclude -Wall -std=c++17 -pthread
-LDFLAGS = -lboost_system -lboost_thread -lboost_chrono
+CXXFLAGS = -Iinclude -Wall -std=c++17 -pthread -DBOOST_LOG_DYN_LINK
+LDFLAGS = -lboost_log_setup -lboost_log -lboost_filesystem -lboost_thread -lboost_system -lboost_chrono -lpthread
 
 SRC_DIR = src
 BUILD_DIR = build

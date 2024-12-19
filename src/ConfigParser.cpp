@@ -16,7 +16,7 @@ ConfigParser::ConfigParser()
             cxxopts::value<std::vector<std::string>>())
         ("c,client-addr-space-sizes", "Address space size for each client",
             cxxopts::value<std::vector<size_t>>())
-        ("m,mem-sizes", "Memory size for each tiering",
+        ("s,mem-sizes", "Memory size for each tiering",
             cxxopts::value<std::vector<size_t>>())
         ("h,help", "Print usage information");
 }

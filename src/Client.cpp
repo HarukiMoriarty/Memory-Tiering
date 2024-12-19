@@ -1,4 +1,5 @@
 #include "Client.hpp"
+#include "Logger.hpp"
 
 #include <iostream>
 #include <boost/chrono.hpp>
@@ -21,6 +22,6 @@ void Client::run() {
             boost::this_thread::sleep_for(boost::chrono::nanoseconds(100));
         }
 
-        std::cout << "Client sent: " << msg.toString() << std::endl;
+        LOG_DEBUG("Client sent: " << msg.toString());
     }
 }
