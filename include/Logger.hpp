@@ -3,18 +3,23 @@
 
 #include <boost/log/trivial.hpp>
 #include <boost/log/sources/severity_logger.hpp>
-#include <memory>
 #include <string>
-#include <sstream>
 
 class Logger {
 public:
-    static Logger& getInstance() {
-        static Logger instance;
-        return instance;
-    }
+    enum LogLevel {
+        trace,
+        debug,
+        info,
+        warning,
+        error,
+        fatal
+    };
 
-    void init(const std::string& logFile = "app_%N.log");
+    static Logger& getInstance();
+    void init();
+    void setLogLevel(LogLevel level);
+    static LogLevel getLogLevelFromEnv();
 
 private:
     Logger() = default;

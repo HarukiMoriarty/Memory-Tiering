@@ -4,23 +4,54 @@
 #include <boost/log/utility/setup/file.hpp>
 #include <boost/log/utility/setup/console.hpp>
 #include <boost/log/utility/setup/common_attributes.hpp>
+#include <cstdlib>
+#include <algorithm>
+#include <cctype>
+#include <string>
 
 namespace logging = boost::log;
 namespace keywords = boost::log::keywords;
 
-void Logger::init(const std::string& logFile) {
+Logger& Logger::getInstance() {
+    static Logger instance;
+    return instance;
+}
+
+Logger::LogLevel Logger::getLogLevelFromEnv() {
+    const char* level = std::getenv("LOG_LEVEL");
+    if (!level) {
+        return LogLevel::info; // Default level
+    }
+
+    std::string levelStr = level;
+    // Convert to lowercase for case-insensitive comparison
+    std::transform(levelStr.begin(), levelStr.end(), levelStr.begin(), ::tolower);
+
+    if (levelStr == "trace") return LogLevel::trace;
+    if (levelStr == "debug") return LogLevel::debug;
+    if (levelStr == "info") return LogLevel::info;
+    if (levelStr == "warning" || levelStr == "warn") return LogLevel::warning;
+    if (levelStr == "error") return LogLevel::error;
+    if (levelStr == "fatal") return LogLevel::fatal;
+
+    return LogLevel::info; // Default if not recognized
+}
+
+void Logger::setLogLevel(LogLevel level) {
+    logging::core::get()->set_filter(
+        logging::trivial::severity >= static_cast<logging::trivial::severity_level>(level)
+    );
+}
+
+void Logger::init() {
     // Setup console logging
     logging::add_console_log(
         std::cout,
         keywords::format = "[%TimeStamp%] [%Severity%] %Message%"
     );
 
-    // Setup file logging
-    logging::add_file_log(
-        keywords::file_name = logFile,
-        keywords::rotation_size = 10 * 1024 * 1024,
-        keywords::format = "[%TimeStamp%] [%ThreadID%] [%Severity%] %Message%"
-    );
-
     logging::add_common_attributes();
+
+    // Set initial log level from environment
+    setLogLevel(getLogLevelFromEnv());
 }
