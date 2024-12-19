@@ -5,7 +5,7 @@
 #include <boost/chrono.hpp>
 #include <boost/thread/thread.hpp> 
 
-Client::Client(RingBuffer<ClientMessage>& buffer, int client_id, int message_cnt, int memory_space, AccessPattern pattern)
+Client::Client(RingBuffer<ClientMessage>& buffer, size_t client_id, size_t message_cnt, size_t memory_space, AccessPattern pattern)
     : buffer_(buffer),
     client_id_(client_id),
     message_cnt_(message_cnt),
@@ -13,8 +13,8 @@ Client::Client(RingBuffer<ClientMessage>& buffer, int client_id, int message_cnt
 }
 
 void Client::run() {
-    for (int i = 0; i < message_cnt_; ++i) {
-        int offset = generator_.generateOffset();
+    for (size_t i = 0; i < message_cnt_; ++i) {
+        size_t offset = generator_.generateOffset();
         OperationType op = (i % 2 == 0) ? OperationType::READ : OperationType::WRITE;
 
         ClientMessage msg(client_id_, offset, op);

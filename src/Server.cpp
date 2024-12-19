@@ -50,7 +50,7 @@ void Server::allocateMemory(const ServerMemoryConfig& config) {
 
     // Allocate memory for remote NUMA pages 
     remote_base_ = allocate_and_bind_to_numa(PAGE_SIZE, local_page_count_, 1);
-  
+
     // Allocate PMEM pages
     pmem_base_ = allocate_and_bind_to_numa(PAGE_SIZE, local_page_count_, 2);
 }
@@ -62,16 +62,17 @@ void Server::handleClientMessage(const ClientMessage& msg) {
 
     // Update access info in PageTable (assume address maps directly to a page_id)
     size_t page_id = static_cast<size_t>(actual_id);
+    void* actual_address = page_table_->getPage(actual_id).page_address;
     page_table_->updateAccess(page_id);
 
     // record access latency
     // TODO: notice we need actual transfer address
     uint64_t access_time;
     if (msg.op_type == OperationType::READ) {
-        access_time = access_page(reinterpret_cast<void*>(actual_id), READ);
+        access_time = access_page(actual_address, READ);
     }
     else {
-        access_time = access_page(reinterpret_cast<void*>(actual_id), WRITE);
+        access_time = access_page(actual_address, WRITE);
     }
     LOG_DEBUG("Access time: " << access_time << " ns");
 }
@@ -82,11 +83,6 @@ void Server::handleMemoryMoveRequest(const MemMoveReq& req) {
 
     size_t page_id = static_cast<size_t>(req.page_id);
     PageMetadata page_meta = page_table_->getPage(page_id);
-
-    if (page_meta.page_id < 0) {
-        std::cerr << "Invalid page_id: " << req.page_id << std::endl;
-        return;
-    }
 
     // Determine the target NUMA node or memory layer
     PageLayer target_node = req.layer_id;

@@ -3,6 +3,7 @@
 
 #include <string>
 #include <cxxopts.hpp>
+#include <iostream>
 
 #include "Common.hpp"
 

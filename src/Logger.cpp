@@ -20,11 +20,10 @@ Logger& Logger::getInstance() {
 Logger::LogLevel Logger::getLogLevelFromEnv() {
     const char* level = std::getenv("LOG_LEVEL");
     if (!level) {
-        return LogLevel::info; // Default level
+        return LogLevel::info; // Default level set to info
     }
 
     std::string levelStr = level;
-    // Convert to lowercase for case-insensitive comparison
     std::transform(levelStr.begin(), levelStr.end(), levelStr.begin(), ::tolower);
 
     if (levelStr == "trace") return LogLevel::trace;
@@ -34,7 +33,7 @@ Logger::LogLevel Logger::getLogLevelFromEnv() {
     if (levelStr == "error") return LogLevel::error;
     if (levelStr == "fatal") return LogLevel::fatal;
 
-    return LogLevel::info; // Default if not recognized
+    return LogLevel::info; // Default to info if not recognized
 }
 
 void Logger::setLogLevel(LogLevel level) {
@@ -44,7 +43,7 @@ void Logger::setLogLevel(LogLevel level) {
 }
 
 void Logger::init() {
-    // Setup console logging
+    // We only use console logging
     logging::add_console_log(
         std::cout,
         keywords::format = "[%TimeStamp%] [%Severity%] %Message%"

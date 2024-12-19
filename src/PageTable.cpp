@@ -1,9 +1,8 @@
 #include "PageTable.hpp"
 
-PageMetadata::PageMetadata(void* addr, PageLayer layer, int id)
+PageMetadata::PageMetadata(void* addr, PageLayer layer)
     : page_address(addr),
     page_layer(layer),
-    page_id(id),
     last_access_time(std::chrono::steady_clock::now()),
     access_count(0)
 {
@@ -94,7 +93,7 @@ void PageTable::initPageTable(const std::vector<size_t>& client_addr_space, cons
     auto fillPages = [&](PageLayer layer, size_t count, void* base, size_t& offset) {
         for (size_t i = 0; i < count; ++i) {
             char* addr = static_cast<char*>(base) + offset * PAGE_SIZE;
-            table_[current_index] = PageMetadata(static_cast<void*>(addr), layer, static_cast<int>(current_index));
+            table_[current_index] = PageMetadata(static_cast<void*>(addr), layer);
             current_index++;
             offset++;
         }
@@ -113,6 +112,10 @@ PageMetadata PageTable::getPage(size_t index) const {
         return table_[index];
     }
     return PageMetadata();
+}
+
+size_t PageTable::getNextPageId() const {
+    return current_index_;
 }
 
 size_t PageTable::size() const {

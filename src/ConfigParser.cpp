@@ -1,9 +1,12 @@
 #include "ConfigParser.hpp"
-#include <iostream>
+#include "Logger.hpp"
 
+/**
+ * Constructor: initializes command line options with default values
+ */
 ConfigParser::ConfigParser()
     : options_("MemoryTiering", "Concurrent Ring Buffer Demonstration"),
-    buffer_size_(10),  // Default values
+    buffer_size_(10),
     message_count_(100),
     help_requested_(false) {
 
@@ -21,30 +24,43 @@ ConfigParser::ConfigParser()
         ("h,help", "Print usage information");
 }
 
+/**
+ * Parses command line arguments and validates configuration
+ * @param argc Argument count
+ * @param argv Argument values
+ * @return true if parsing successful, false otherwise
+ */
 bool ConfigParser::parse(int argc, char* argv[]) {
     auto result = options_.parse(argc, argv);
 
+    // Handle help request
     if (result.count("help")) {
         std::cout << options_.help() << std::endl;
         help_requested_ = true;
         return false;
     }
 
+    // Parse basic parameters
     buffer_size_ = result["buffer-size"].as<size_t>();
     message_count_ = result["messages"].as<size_t>();
+
+    // Parse client configurations
     auto patterns = result["patterns"].as<std::vector<std::string>>();
     auto client_addr_space_sizes = result["client-addr-space-sizes"].as<std::vector<size_t>>();
     auto mem_sizes = result["mem-sizes"].as<std::vector<size_t>>();
 
+    // Validate client configuration counts match
     if (patterns.size() != client_addr_space_sizes.size()) {
-        std::cerr << "Error: Number of patterns must match number of memory sizes" << std::endl;
+        LOG_ERROR("Error: Number of patterns must match number of memory sizes");
         return false;
     }
 
+    // Process each client's configuration
     for (size_t i = 0; i < patterns.size(); i++) {
         ClientConfig config;
         config.addr_space_size = client_addr_space_sizes[i];
 
+        // Parse access pattern type
         if (patterns[i] == "uniform") {
             config.pattern = AccessPattern::UNIFORM;
         }
@@ -52,23 +68,23 @@ bool ConfigParser::parse(int argc, char* argv[]) {
             config.pattern = AccessPattern::SKEWED_70_20_10;
         }
         else {
-            std::cerr << "Invalid pattern type: " << patterns[i] << std::endl;
+            LOG_ERROR("Invalid pattern type: " << patterns[i]);
             return false;
         }
 
         client_configs_.push_back(config);
     }
 
-    // Server configuration, order: local_numa_size, remote_numa_size, pmem_size
+    // Parse server memory configuration
+    // Expected order: local_numa_size, remote_numa_size, pmem_size
     if (mem_sizes.size() != 3) {
-        std::cerr << "Error: Server configuration must have exactly three memory size" << std::endl;
+        LOG_ERROR("Error: Server configuration must have exactly three memory sizes");
         return false;
     }
 
     server_memory_config_.local_numa_size = mem_sizes[0];
     server_memory_config_.remote_numa_size = mem_sizes[1];
     server_memory_config_.pmem_size = mem_sizes[2];
-
 
     return true;
 }
