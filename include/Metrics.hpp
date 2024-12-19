@@ -3,6 +3,14 @@
 
 #include <atomic>
 #include <cstdint>
+#include <boost/accumulators/accumulators.hpp>
+#include <boost/accumulators/statistics/stats.hpp>
+#include <boost/accumulators/statistics/mean.hpp>
+#include <boost/accumulators/statistics/min.hpp>
+#include <boost/accumulators/statistics/max.hpp>
+#include <boost/accumulators/statistics/extended_p_square.hpp>
+
+namespace acc = boost::accumulators;
 
 /**
  * Memory metrics collector with atomic counters
@@ -33,6 +41,17 @@ public:
     inline void incrementLocalToPmem() { local_to_pmem_count_++; }
     inline void incrementPmemToLocal() { pmem_to_local_count_++; }
 
+    // Latency recording
+    inline void recordAccessLatency(uint64_t latency_ns) {
+        access_latency_(latency_ns);
+        total_latency_ += latency_ns;
+    }
+
+    inline void recordMigrationLatency(uint64_t latency_ns) {
+        migration_latency_(latency_ns);
+        total_latency_ += latency_ns;
+    }
+
     // Print current metrics (call periodically or at program end)
     void printMetricsThreeTiers() const;
     void printMetricsTwoTiers() const;
@@ -55,6 +74,23 @@ private:
     std::atomic<uint64_t> remote_to_pmem_count_{ 0 };
     std::atomic<uint64_t> local_to_pmem_count_{ 0 };
     std::atomic<uint64_t> pmem_to_local_count_{ 0 };
+
+    // Latency tracking
+    static constexpr double probabilities[] = { 0.0, 0.50, 0.99 };
+
+    using AccumulatorType = acc::accumulator_set<uint64_t,
+        acc::stats<
+        acc::tag::min,
+        acc::tag::max,
+        acc::tag::extended_p_square
+        >
+    >;
+
+    AccumulatorType access_latency_{ acc::tag::extended_p_square::probabilities = probabilities };
+    AccumulatorType migration_latency_{ acc::tag::extended_p_square::probabilities = probabilities };
+
+    // Total latency tracking for throughput calculation
+    std::atomic<uint64_t> total_latency_{ 0 };
 };
 
 #endif

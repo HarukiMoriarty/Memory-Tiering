@@ -12,7 +12,7 @@ class Server;
 class Scanner {
 private:
     PageTable& page_table_;
-    bool running_ = true; // To control the continuous scanning process
+    bool running_; // To control the continuous scanning process
 
 public:
     // Constructor

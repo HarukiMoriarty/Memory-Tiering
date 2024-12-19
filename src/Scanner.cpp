@@ -25,6 +25,7 @@ bool Scanner::classifyColdPage(const PageMetadata& page, boost::chrono::millisec
 
 // Continuously classify pages using scanNext()
 void Scanner::runClassifier(RingBuffer<MemMoveReq>& move_page_buffer, size_t min_access_count, boost::chrono::milliseconds time_threshold, size_t num_tiers) {
+    running_ = true;
     while (running_) {
         size_t page_id = page_table_.getNextPageId();
         PageMetadata page = page_table_.scanNext();

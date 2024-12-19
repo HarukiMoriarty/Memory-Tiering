@@ -154,6 +154,7 @@ void Server::handleClientMessage(const ClientMessage& msg) {
     else {
         access_time = access_page(page_meta.page_address, WRITE);
     }
+    Metrics::getInstance().recordAccessLatency(access_time);
     LOG_DEBUG("Access time: " << access_time << " ns");
 }
 
@@ -195,6 +196,7 @@ void Server::handleMemoryMoveRequest(const MemMoveReq& req) {
     // Perform the page migration
     LOG_DEBUG("Moving Page " << page_id << " from Node " << current_node << " to Node " << target_node << "...");
     uint64_t migrate_time = migrate_page(page_meta.page_address, current_node, target_node);
+    Metrics::getInstance().recordMigrationLatency(migrate_time);
     LOG_DEBUG("Migration time: " << migrate_time << " ns");
 
     // After the move, update the page layer in the PageTable
