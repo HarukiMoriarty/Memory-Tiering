@@ -41,10 +41,10 @@ $ LOG_LEVEL=info ./build/main -p uniform,skewed,uniform -c 1000,2000,1500 -b 100
 
 Where:
 - `-p`, `--patterns`: Memory access patterns for each client (uniform/skewed)
-- `-s`, `--sizes`: Address space size for each client
+- `-c`, `--client-addr-space-sizes`: Address space size for each client
 - `-b`, `--buffer-size`: Size of ring buffer
 - `-m`, `--messages`: Number of messages per client
-- `-c`, `--server`: Memory configuration for each tiering
+- `-s`, `--mem-sizes`: Memory configuration for each tiering
 - `-h`, `--help`: Print usage information
 - `--hot-access-cnt`: Hot access cnt for promote a page
 - `--cold-access-interval`: Cold access interval for demote a page
