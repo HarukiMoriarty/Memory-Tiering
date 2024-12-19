@@ -109,7 +109,7 @@ void ConfigParser::printConfig() const {
     // Policy configuration
     LOG_INFO("Hot Page Policy:");
     LOG_INFO("  - Hot Access Count: " << policy_config_.hot_access_cnt);
-    LOG_INFO("  - Cold Access Interval: " << policy_config_.cold_access_interval << "ms");
+    LOG_INFO("  - Cold Access Interval: " << policy_config_.cold_access_interval << " ms");
 
     // Server memory configuration
     LOG_INFO("Memory Tier Sizes:");
@@ -123,7 +123,7 @@ void ConfigParser::printConfig() const {
         LOG_INFO("  Client " << i + 1 << ":");
         LOG_INFO("    - Pattern: " <<
             (client_configs_[i].pattern == AccessPattern::UNIFORM ? "Uniform" : "Skewed"));
-        LOG_INFO("    - Address Space Size: " << client_configs_[i].addr_space_size << " bytes");
+        LOG_INFO("    - Address Space Size: " << client_configs_[i].addr_space_size << " pages");
     }
 
     LOG_INFO("==========================================");
