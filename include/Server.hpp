@@ -11,8 +11,8 @@
 
 class Server {
 public:
-    Server(RingBuffer<ClientMessage>& client_buffer, RingBuffer<MemMoveReq>& move_page_buffer_, 
-        const std::vector<int>& client_memory_spaces, const ServerMemoryConfig& server_config);
+    Server(RingBuffer<ClientMessage>& client_buffer, RingBuffer<MemMoveReq>& move_page_buffer_,
+        const std::vector<size_t>& client_memory_spaces, const ServerMemoryConfig& server_config);
     void handleClientMessage(const ClientMessage& msg);
     void handleMemoryMoveRequest(const MemMoveReq& req);
     void runManagerThread();
@@ -22,7 +22,7 @@ public:
 private:
     RingBuffer<ClientMessage>& client_buffer_;
     RingBuffer<MemMoveReq>& move_page_buffer_;
-    std::vector<int> base_addresses_;
+    std::vector<size_t> base_page_id_;
     PageTable* page_table_;
     Scanner* scanner_;
     ServerMemoryConfig server_config_;

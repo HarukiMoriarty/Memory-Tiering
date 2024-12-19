@@ -9,7 +9,7 @@ SRC = $(wildcard $(SRC_DIR)/*.cpp) main.cpp
 OBJ = $(patsubst %.cpp,$(OBJ_DIR)/%.o,$(notdir $(SRC)))
 TARGET = $(BUILD_DIR)/main
 
-all: $(TARGET)
+all: clean $(TARGET)
 
 $(TARGET): $(OBJ)
 	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS)

@@ -36,6 +36,12 @@ inline std::ostream& operator<<(std::ostream& os, const PageLayer& layer) {
     return os;
 }
 
+struct ServerMemoryConfig {
+    size_t local_numa_size;
+    size_t remote_numa_size;
+    size_t pmem_size;
+};
+
 class MemoryAccessGenerator {
 private:
     AccessPattern pattern_;
@@ -114,12 +120,6 @@ struct MemMoveReq {
             << " to Layer: " << layer_id;
         return ss.str();
     }
-};
-
-struct ServerMemoryConfig {
-    size_t local_numa_size;
-    size_t remote_numa_size;
-    size_t pmem_size;
 };
 
 #endif // COMMON_H

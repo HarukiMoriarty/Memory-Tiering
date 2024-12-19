@@ -1,40 +1,42 @@
 #include "Server.hpp"
+#include "Common.hpp"
 
 #include <iostream>
 #include <boost/chrono.hpp>
 #include <boost/thread/thread.hpp> 
 
-Server::Server(RingBuffer<ClientMessage>& client_buffer, RingBuffer<MemMoveReq>& move_page_buffer, 
-    const std::vector<int>& client_memory_sizes, const ServerMemoryConfig& server_config)
+Server::Server(RingBuffer<ClientMessage>& client_buffer, RingBuffer<MemMoveReq>& move_page_buffer,
+    const std::vector<size_t>& client_addr_space, const ServerMemoryConfig& server_config)
     : client_buffer_(client_buffer), move_page_buffer_(move_page_buffer), server_config_(server_config) {
     // Calculate base addresses for each client
-    int current_base = 0;
-    for (int size : client_memory_sizes) {
-        base_addresses_.push_back(current_base);
+    size_t current_base = 0;
+    for (size_t size : client_addr_space) {
+        base_page_id_.push_back(current_base);
         current_base += size;
     }
-    
+
     // Init PageTable with the total memory size
     page_table_ = new PageTable(current_base);
-
     scanner_ = new Scanner(*page_table_);
 }
 
 // Helper function to handle a ClientMessage
 void Server::handleClientMessage(const ClientMessage& msg) {
     std::cout << "Server received: " << msg.toString() << std::endl;
-    int actual_address = base_addresses_[msg.client_id] + msg.offset;
+    size_t actual_id = base_page_id_[msg.client_id] + msg.offset;
 
     // Update access info in PageTable (assume address maps directly to a page_id)
-    size_t page_id = static_cast<size_t>(actual_address);
+    size_t page_id = static_cast<size_t>(actual_id);
     page_table_->updateAccess(page_id);
 
     // record access latency
+    // TODO: notice we need actual transfer address
     uint64_t access_time;
     if (msg.op_type == OperationType::READ) {
-        access_time = access_page(reinterpret_cast<void*>(actual_address), READ);
-    } else {
-        access_time = access_page(reinterpret_cast<void*>(actual_address), WRITE);
+        access_time = access_page(reinterpret_cast<void*>(actual_id), READ);
+    }
+    else {
+        access_time = access_page(reinterpret_cast<void*>(actual_id), WRITE);
     }
     std::cout << "Access time: " << access_time << " ns" << std::endl;
 }
@@ -61,9 +63,9 @@ void Server::handleMemoryMoveRequest(const MemMoveReq& req) {
     }
 
     // Perform the page migration
-    std::cout << "Moving Page " << page_id 
-                << " from Node " << current_node 
-                << " to Node " << target_node << "..." << std::endl;
+    std::cout << "Moving Page " << page_id
+        << " from Node " << current_node
+        << " to Node " << target_node << "..." << std::endl;
     migrate_page(page_meta.page_address, current_node, target_node);
 
     // After the move, update the page layer in the PageTable
