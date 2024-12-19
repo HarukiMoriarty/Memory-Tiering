@@ -15,15 +15,15 @@ bool Scanner::classifyHotPage(const PageMetadata& page, size_t min_access_count)
 }
 
 // Check if a page is cold based on both access count and time threshold
-bool Scanner::classifyColdPage(const PageMetadata& page, std::chrono::seconds time_threshold) const {
+bool Scanner::classifyColdPage(const PageMetadata& page, std::chrono::milliseconds time_threshold) const {
     auto current_time = std::chrono::steady_clock::now();
-    auto time_since_last_access = std::chrono::duration_cast<std::chrono::seconds>(
+    auto time_since_last_access = std::chrono::duration_cast<std::chrono::milliseconds>(
         current_time - page.last_access_time);
     return time_since_last_access >= time_threshold;
 }
 
 // Continuously classify pages using scanNext()
-void Scanner::runClassifier(RingBuffer<MemMoveReq>& move_page_buffer, size_t min_access_count, std::chrono::seconds time_threshold) {
+void Scanner::runClassifier(RingBuffer<MemMoveReq>& move_page_buffer, size_t min_access_count, std::chrono::milliseconds time_threshold) {
     running_ = true;
     while (running_) {
         size_t page_id = page_table_.getNextPageId();

@@ -131,8 +131,8 @@ void Server::runManagerThread() {
 void Server::runPolicyThread() {
     // TODO: Scan
     // Pre-defined thresholds
-    size_t min_access_count = 10;
-    std::chrono::seconds time_threshold(10);
+    size_t min_access_count = 1;
+    std::chrono::milliseconds time_threshold(10);
     scanner_->runClassifier(move_page_buffer_, min_access_count, time_threshold);
     // TODO: Policy -> move page decision
 }
