@@ -9,18 +9,18 @@ ID=1
 LOG_LEVEL="info"
 EXECUTABLE="./build/main"
 BUFFER_SIZE=100
-MESSAGE_COUNT=10000
+MESSAGE_COUNT=100000
 MEMORY_SIZES_TIER_2="6400,21480"
 MEMORY_SIZES_TIER_3="1280,5120,21480"
 
 # Define the variations for the parameters
-PATTERNS=("uniform,uniform,uniform" "uniform,uniform,skewed" "skewed,uniform,skewed" "skewed,skewed,skewed")
-HOT_ACCESS_COUNTS=(1 5 10 30 50)
-COLD_ACCESS_INTERVALS=(10 100 200 500 1000)
+PATTERNS=("uniform,uniform,uniform" "uniform,uniform,skewed" "skewed,skewed,skewed")
+HOT_ACCESS_COUNTS=(1 4 8 32 64 128)
+COLD_ACCESS_INTERVALS=(10 100 200 800 1600 6400)
 TIERS=(2 3)
 
 # CSV file to store results
-CSV_FILE="experiment_results.csv"
+CSV_FILE="results.csv"
 
 # Write the CSV header
 echo "ExperimentID,Tier,Pattern,HotAccessCount,ColdAccessInterval,NUMALocalAccess,NUMARemoteAccess,DRAMAccess,PMEMAccess,MinLatency,P50Latency,P99Latency,MaxLatency,MeanLatency,MigrationMinLatency,MigrationP50Latency,MigrationP99Latency,MigrationMaxLatency,MigrationMeanLatency,LocalToRemote,RemoteToLocal,PMEMToRemote,RemoteToPMEM,LocalToPMEM,PMEMToLocal,DRAMToPMEM,PMEMToDRAM,Throughput" > $CSV_FILE
