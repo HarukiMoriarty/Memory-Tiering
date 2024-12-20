@@ -1,16 +1,18 @@
 # Memory Tiering Policy
 
-## Server Memory Size Config
+## Server Memory Tiers Size Config
 
-numa local: 5 GiB       5 * 1024 / 4 = 1280 * 20 = 25 MB
+numa local: 5 GiB       5 * 1024 / 4  = 1280 Pages      1280 * 20 Byte = 25 MB Entry Table
 
-numa remote: 20 GiB     1280 * 4 = 5120 = 100 MB
+numa remote: 20 GiB     20 * 1024 / 4  = 5120 Pages     5120 * 20 Byte = 100 MB Entry Table
 
-pmem: 80 GiB            5120 * 4 = 400 MB
+pmem: 80 GiB            20 * 1024 / 4 = 20480 Pages     20480 * 20 Bytes = 400 MB Entry Table
+
+All entry tables locate at the numa local memory
 
 ## Client Page Partition
 
-Server page number partition (1:4:16): 
+Server page number partition (1:4:16): following memory distribution 
 
 - numa local: 1280
 - numa remote: 5120
@@ -26,9 +28,9 @@ Then the client partition of numa local pages is
 
 The client partition of numa remote pages is
 
-- client 1: 1000 * 5120 / 4500 = 1137 > (1000 - 284) = 716 -> finish allocation
-- client 2: 2000 * 5120 / 4500 = 2274 > (2000 - 568) = 1432 -> finish allocation
-- client 3: 1500 * 5120 / 4500 = 1709 > (1500 - 426) = 1074 -> finish allocation
+- client 1: 1000 * 5120 / 4500 = 1137 > (1000 - 284) = 716 
+- client 2: 2000 * 5120 / 4500 = 2274 > (2000 - 568) = 1432 
+- client 3: 1500 * 5120 / 4500 = 1709 > (1500 - 426) = 1074 
 
 ## Evaluation
 
