@@ -1,5 +1,10 @@
 #!/bin/bash
 
+# Set the number of repetitions for each configuration
+ITERATIONS=5
+# Initialize a counter for the unique ID
+ID=1
+
 # Set the default values for the other parameters
 LOG_LEVEL="info"
 EXECUTABLE="./build/main"
@@ -18,7 +23,7 @@ TIERS=(2 3)
 CSV_FILE="experiment_results.csv"
 
 # Write the CSV header
-echo "Tier,Pattern,HotAccessCount,ColdAccessInterval,NUMALocalAccess,NUMARemoteAccess,DRAMAccess,PMEMAccess,MinLatency,P50Latency,P99Latency,MaxLatency,MeanLatency,MigrationMinLatency,MigrationP50Latency,MigrationP99Latency,MigrationMaxLatency,MigrationMeanLatency,LocalToRemote,RemoteToLocal,PMEMToRemote,RemoteToPMEM,LocalToPMEM,PMEMToLocal,DRAMToPMEM,PMEMToDRAM,Throughput" > $CSV_FILE
+echo "ExperimentID,Tier,Pattern,HotAccessCount,ColdAccessInterval,NUMALocalAccess,NUMARemoteAccess,DRAMAccess,PMEMAccess,MinLatency,P50Latency,P99Latency,MaxLatency,MeanLatency,MigrationMinLatency,MigrationP50Latency,MigrationP99Latency,MigrationMaxLatency,MigrationMeanLatency,LocalToRemote,RemoteToLocal,PMEMToRemote,RemoteToPMEM,LocalToPMEM,PMEMToLocal,DRAMToPMEM,PMEMToDRAM,Throughput" > $CSV_FILE
 
 # Function to parse output and extract metrics
 parse_output() {
@@ -114,24 +119,26 @@ for tier in "${TIERS[@]}"; do
     for pattern in "${PATTERNS[@]}"; do
         for hot_access_cnt in "${HOT_ACCESS_COUNTS[@]}"; do
             for cold_access_interval in "${COLD_ACCESS_INTERVALS[@]}"; do
-                # Construct the command
-                CMD="LOG_LEVEL=$LOG_LEVEL $EXECUTABLE -p $pattern -c 1000,2000,1500 -b $BUFFER_SIZE -m $MESSAGE_COUNT -t $tier -s $MEMORY_SIZES --hot-access-cnt $hot_access_cnt --cold-access-interval $cold_access_interval"
+                for ((iteration=1; iteration<=ITERATIONS; iteration++)); do
+                    # Construct the command
+                    CMD="LOG_LEVEL=$LOG_LEVEL $EXECUTABLE -p $pattern -c 1000,2000,1500 -b $BUFFER_SIZE -m $MESSAGE_COUNT -t $tier -s $MEMORY_SIZES --hot-access-cnt $hot_access_cnt --cold-access-interval $cold_access_interval"
 
-                # Run the command and capture output
-                OUTPUT=$(eval $CMD 2>&1)
+                    # Run the command and capture output
+                    OUTPUT=$(eval $CMD 2>&1)
 
-                # Parse the output
-                METRICS=$(parse_output "$OUTPUT")
+                    # Parse the output
+                    METRICS=$(parse_output "$OUTPUT")
 
-                # Append the configuration and metrics to the CSV file
-                echo "$tier,\"$pattern\",$hot_access_cnt,$cold_access_interval,$METRICS"  >> $CSV_FILE
-
-                # Check the exit status
-                if [ $? -ne 0 ]; then
-                    echo "Command failed: $CMD"
-                else
-                    echo "Command succeeded: $CMD"
-                fi
+                    # Append the configuration and metrics to the CSV file
+                    echo "$ID,$tier,\"$pattern\",$hot_access_cnt,$cold_access_interval,$METRICS"  >> $CSV_FILE
+                    ((ID++))
+                    # Check the exit status
+                    if [ $? -ne 0 ]; then
+                        echo "Command failed: $CMD"
+                    else
+                        echo "Command succeeded: $CMD"
+                    fi
+                done
             done
         done
     done
