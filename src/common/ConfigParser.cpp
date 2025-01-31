@@ -1,6 +1,16 @@
 #include "ConfigParser.hpp"
 #include "Logger.hpp"
 
+std::vector<std::string> ConfigParser::split(const std::string& s, char delim) {
+    std::vector<std::string> result;
+    std::stringstream ss(s);
+    std::string item;
+    while (getline(ss, item, delim)) {
+        result.push_back(item);
+    }
+    return result;
+}
+
 /**
  * Constructor: initializes command line options with default values
  */
@@ -11,64 +21,64 @@ ConfigParser::ConfigParser()
     help_requested_(false) {
 
     options_.add_options()
-        ("b,buffer-size", "Size of ring buffer",
-            cxxopts::value<size_t>()->default_value("10"))
-        ("m,messages", "Number of messages per client",
-            cxxopts::value<size_t>()->default_value("100"))
-        ("p,patterns", "Memory access patterns for each client (uniform/skewed)",
-            cxxopts::value<std::vector<std::string>>())
-        ("c,client-addr-space-sizes", "Address space size for each client",
-            cxxopts::value<std::vector<size_t>>())
-        ("t,num-tiers", "Number of memory tiers",
-            cxxopts::value<size_t>()->default_value("3"))
-        ("s,mem-sizes", "Memory size for each tiering",
-            cxxopts::value<std::vector<size_t>>())
-        ("hot-access-cnt", "Access count for determine a hot page",
-            cxxopts::value<size_t>()->default_value("10"))
-        ("cold-access-interval", "Access interval for determine a cold page",
-            cxxopts::value<size_t>()->default_value("1000"))
+        ("b,buffer-size", "Size of ring buffer", cxxopts::value<size_t>()->default_value("10"))
+        ("m,messages", "Number of messages per client", cxxopts::value<size_t>()->default_value("100"))
+        ("p,patterns", "Memory access patterns for each client (uniform/skewed)", cxxopts::value<std::vector<std::string>>())
+        ("c,client-tier-sizes", "Memory space size per tier per client (client1_local,client1_remote,client1_pmem ...)", cxxopts::value<std::vector<std::string>>())
+        ("t,num-tiers", "Number of memory tiers", cxxopts::value<size_t>()->default_value("3"))
+        ("s,mem-sizes", "Memory size in pages for each tier", cxxopts::value<std::vector<size_t>>())
+        ("hot-access-cnt", "Hot page threshold count", cxxopts::value<size_t>()->default_value("10"))
+        ("cold-access-interval", "Cold page interval (ms)", cxxopts::value<size_t>()->default_value("1000"))
         ("h,help", "Print usage information");
 }
 
-/**
- * Parses command line arguments and validates configuration
- * @param argc Argument count
- * @param argv Argument values
- * @return true if parsing successful, false otherwise
- */
-bool ConfigParser::parse(int argc, char* argv[]) {
-    auto result = options_.parse(argc, argv);
-
-    // Handle help request
-    if (result.count("help")) {
-        std::cout << options_.help() << std::endl;
-        help_requested_ = true;
-        return false;
-    }
-
-    // Parse basic parameters
+bool ConfigParser::parseBasicConfig(const cxxopts::ParseResult& result) {
     buffer_size_ = result["buffer-size"].as<size_t>();
     message_count_ = result["messages"].as<size_t>();
     policy_config_.hot_access_cnt = result["hot-access-cnt"].as<size_t>();
     policy_config_.cold_access_interval = result["cold-access-interval"].as<size_t>();
+    server_memory_config_.num_tiers = result["num-tiers"].as<size_t>();
 
-    // Parse client configurations
-    auto patterns = result["patterns"].as<std::vector<std::string>>();
-    auto client_addr_space_sizes = result["client-addr-space-sizes"].as<std::vector<size_t>>();
+    if (server_memory_config_.num_tiers < 2 || server_memory_config_.num_tiers > 3) {
+        LOG_ERROR("Number of tiers must be between 2 and 3");
+        return false;
+    }
+    return true;
+}
+
+bool ConfigParser::parseServerConfig(const cxxopts::ParseResult& result) {
     auto mem_sizes = result["mem-sizes"].as<std::vector<size_t>>();
-
-    // Validate client configuration counts match
-    if (patterns.size() != client_addr_space_sizes.size()) {
-        LOG_ERROR("Error: Number of patterns must match number of memory sizes");
+    if (mem_sizes.size() != server_memory_config_.num_tiers) {
+        LOG_ERROR("Server configuration must have exactly " << server_memory_config_.num_tiers << " memory sizes");
         return false;
     }
 
-    // Process each client's configuration
+    server_memory_config_.local_numa_size = mem_sizes[0];
+    server_memory_config_.remote_numa_size = (server_memory_config_.num_tiers == 3) ? mem_sizes[1] : 0;
+    server_memory_config_.pmem_size = mem_sizes.back();
+    return true;
+}
+
+bool ConfigParser::parseClientConfigs(const std::vector<std::string>& patterns,
+    const std::vector<std::string>& tier_sizes) {
+    if (patterns.size() != tier_sizes.size()) {
+        LOG_ERROR("Number of patterns must match number of clients");
+        return false;
+    }
+
     for (size_t i = 0; i < patterns.size(); i++) {
         ClientConfig config;
-        config.addr_space_size = client_addr_space_sizes[i];
+        auto sizes = split(tier_sizes[i], ' ');
 
-        // Parse access pattern type
+        if (sizes.size() != server_memory_config_.num_tiers) {
+            LOG_ERROR("Invalid number of tier sizes for client " << i);
+            return false;
+        }
+
+        for (const auto& size : sizes) {
+            config.tier_sizes.push_back(std::stoul(size));
+        }
+
         if (patterns[i] == "uniform") {
             config.pattern = AccessPattern::UNIFORM;
         }
@@ -82,72 +92,94 @@ bool ConfigParser::parse(int argc, char* argv[]) {
 
         client_configs_.push_back(config);
     }
+    return true;
+}
 
-    // Parse server memory configuration
-    size_t num_tiers_ = result["num-tiers"].as<size_t>();
-    if (num_tiers_ < 2 || num_tiers_ > 4) {
-        LOG_ERROR("Error: Number of tiers must be at least 2 and at most 3");
-        return false;
-    }
-    // Expected order: local_numa_size, remote_numa_size, pmem_size
-    if (mem_sizes.size() != num_tiers_) {
-        LOG_ERROR("Error: Server configuration must have exactly " << num_tiers_ << " memory sizes.");
+bool ConfigParser::parse(int argc, char* argv[]) {
+    auto result = options_.parse(argc, argv);
+    if (result.count("help")) {
+        std::cout << options_.help() << std::endl;
+        help_requested_ = true;
         return false;
     }
 
-    server_memory_config_.num_tiers = num_tiers_;
-    server_memory_config_.local_numa_size = mem_sizes[0]; 
-    if (num_tiers_ == 2) {
-        server_memory_config_.remote_numa_size = 0;          
-        server_memory_config_.pmem_size = mem_sizes[1]; 
+    if (!parseBasicConfig(result) || !parseServerConfig(result)) {
+        return false;
     }
-    else{
-        server_memory_config_.remote_numa_size = mem_sizes[1];
-        server_memory_config_.pmem_size = mem_sizes[2];
+
+    if (!parseClientConfigs(result["patterns"].as<std::vector<std::string>>(),
+        result["client-tier-sizes"].as<std::vector<std::string>>())) {
+        return false;
+    }
+
+    if (!validateMemoryConfiguration()) {
+        return false;
     }
 
     printConfig();
     return true;
 }
 
-/**
- * Print all configuration parameters in a formatted way
- */
+std::string ConfigParser::getTierName(size_t tier_idx, size_t num_tiers) {
+    if (num_tiers == 2) {
+        return (tier_idx == 0) ? "DRAM" : "PMEM";
+    }
+    return (tier_idx == 0) ? "Local NUMA" :
+        (tier_idx == 1) ? "Remote NUMA" : "PMEM";
+}
+
+bool ConfigParser::validateMemoryConfiguration() {
+    std::vector<size_t> tier_totals(server_memory_config_.num_tiers, 0);
+
+    for (const auto& client : client_configs_) {
+        for (size_t i = 0; i < server_memory_config_.num_tiers; i++) {
+            tier_totals[i] += client.tier_sizes[i];
+        }
+    }
+
+    const size_t* tier_limits[] = {
+        &server_memory_config_.local_numa_size,
+        &server_memory_config_.remote_numa_size,
+        &server_memory_config_.pmem_size
+    };
+
+    for (size_t i = 0; i < server_memory_config_.num_tiers; i++) {
+        if (tier_totals[i] > *tier_limits[i]) {
+            LOG_ERROR("Memory allocation exceeds " << getTierName(i, server_memory_config_.num_tiers) << " limit");
+            return false;
+        }
+    }
+    return true;
+}
+
 void ConfigParser::printConfig() const {
     LOG_INFO("========== Configuration Parameters ==========");
-
-    // Basic parameters
     LOG_INFO("Buffer Size: " << buffer_size_);
     LOG_INFO("Message Count: " << message_count_);
-
-    // Policy configuration
     LOG_INFO("Hot Page Policy:");
     LOG_INFO("  - Hot Access Count: " << policy_config_.hot_access_cnt);
     LOG_INFO("  - Cold Access Interval: " << policy_config_.cold_access_interval << " ms");
-
-    // Number of tiers
     LOG_INFO("Number of Tiers: " << server_memory_config_.num_tiers);
-    // Server memory configuration
+
     LOG_INFO("Memory Tier Sizes:");
-   
-    if (server_memory_config_.num_tiers == 2) {
-        LOG_INFO("  - DRAM: " << server_memory_config_.local_numa_size << " pages");
-        LOG_INFO("  - PMEM: " << server_memory_config_.pmem_size << " pages");
-    }
-    if (server_memory_config_.num_tiers == 3 ) {
-        LOG_INFO("  - Local NUMA: " << server_memory_config_.local_numa_size << " pages");
-        LOG_INFO("  - Remote NUMA: " << server_memory_config_.remote_numa_size << " pages");
-        LOG_INFO("  - PMEM: " << server_memory_config_.pmem_size << " pages");
+    for (size_t i = 0; i < server_memory_config_.num_tiers; i++) {
+        const size_t* sizes[] = {
+            &server_memory_config_.local_numa_size,
+            &server_memory_config_.remote_numa_size,
+            &server_memory_config_.pmem_size
+        };
+        LOG_INFO("  - " << getTierName(i, server_memory_config_.num_tiers) << ": " << *sizes[i] << " pages");
     }
 
-    // Client configurations
     LOG_INFO("Client Configurations:");
     for (size_t i = 0; i < client_configs_.size(); i++) {
         LOG_INFO("  Client " << i + 1 << ":");
         LOG_INFO("    - Pattern: " <<
             (client_configs_[i].pattern == AccessPattern::UNIFORM ? "Uniform" : "Skewed"));
-        LOG_INFO("    - Address Space Size: " << client_configs_[i].addr_space_size << " pages");
+        for (size_t j = 0; j < client_configs_[i].tier_sizes.size(); j++) {
+            LOG_INFO("    - " << getTierName(j, server_memory_config_.num_tiers) <<
+                ": " << client_configs_[i].tier_sizes[j] << " pages");
+        }
     }
-
     LOG_INFO("==========================================");
 }
