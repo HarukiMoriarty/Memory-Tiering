@@ -1,8 +1,5 @@
 .vscode/*
 *.o
-test1.c
-numa*
-pmem*
-main
 build
 benchmark
+result
