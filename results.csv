@@ -1,0 +1,3 @@
+ExperimentID,Tier,Pattern,HotAccessCount,ColdAccessInterval,NUMALocalAccess,NUMARemoteAccess,DRAMAccess,PMEMAccess,MinLatency,P50Latency,P99Latency,MaxLatency,MeanLatency,MigrationMinLatency,MigrationP50Latency,MigrationP99Latency,MigrationMaxLatency,MigrationMeanLatency,LocalToRemote,RemoteToLocal,PMEMToRemote,RemoteToPMEM,LocalToPMEM,PMEMToLocal,DRAMToPMEM,PMEMToDRAM,Throughput
+1,2,"uniform,uniform,uniform",1,10,,,162301,137699,24,38.6195,2392.09,13960,123.274,17687,25742,44038.3,1833954,27124,,,,,,,28227,25814,199629
+2,2,"uniform,uniform,uniform",1,10,,,166221,133779,23,39.2157,4024.77,37526,103.577,17626,24457.9,46094.8,1062842,25616.7,,,,,,,24801,21739,245243
