@@ -17,11 +17,8 @@ sudo apt-get install libnuma-dev cmake build-essential
 
 ### Building
 ```bash
-# Create build directory
-mkdir build && cd build
-
 # Build
-make -j$(nproc)
+mkdir build && make -j$(nproc)
 ```
 
 ### Running

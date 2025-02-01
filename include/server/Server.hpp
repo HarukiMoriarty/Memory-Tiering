@@ -18,7 +18,7 @@ public:
     ~Server();
 
     // Allocates memory in all three tiers and stores base addresses
-    void allocateMemory(const std::vector<ClientConfig>& client_configs);
+    void allocateMemory();
     void generateRandomContent();
     void handleClientMessage(const ClientMessage& msg);
     void handleMemoryMoveRequest(const MemMoveReq& req);
@@ -33,17 +33,19 @@ public:
 private:
     RingBuffer<ClientMessage>& client_buffer_;
     RingBuffer<MemMoveReq>& move_page_buffer_;
+
     std::vector<size_t> base_page_id_;
     PageTable* page_table_;
     Scanner* scanner_;
+
     ServerMemoryConfig server_config_;
     PolicyConfig policy_config_;
     std::vector<bool> client_done_flags_;
 
-    // Number of pages in each tier, stored for convenience
-    size_t local_page_count_ = 0;
-    size_t remote_page_count_ = 0;
-    size_t pmem_page_count_ = 0;
+    // Number of pages load in each tier
+    size_t local_page_load_ = 0;
+    size_t remote_page_load_ = 0;
+    size_t pmem_page_load_ = 0;
 
     void* local_base_ = nullptr;
     void* remote_base_ = nullptr;

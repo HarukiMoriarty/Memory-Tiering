@@ -59,14 +59,25 @@ struct ClientConfig {
     std::vector<size_t> tier_sizes;
 };
 
+struct LayerInfo {
+    size_t count;
+    size_t capacity;
+
+    LayerInfo() : count(0), capacity(0) {}
+
+    inline bool isFull() const {
+        return count >= capacity;
+    }
+};
+
 /**
  * Configuration structure for server memory tiers
  */
 struct ServerMemoryConfig {
     size_t num_tiers;
-    size_t local_numa_capacity;   // Capacity of local NUMA memory
-    size_t remote_numa_capacity;  // Capacity of remote NUMA memory
-    size_t pmem_capacity;         // Capacity of persistent memory
+    LayerInfo local_numa;
+    LayerInfo remote_numa;
+    LayerInfo pmem;
 };
 
 struct PolicyConfig {
