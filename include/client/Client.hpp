@@ -5,10 +5,11 @@
 
 #include "RingBuffer.hpp"
 #include "Common.hpp"
+#include "Generator.hpp"
 
 class Client {
 public:
-    Client(RingBuffer<ClientMessage>& buffer, size_t client_id, size_t message_cnt, size_t memory_space, AccessPattern pattern);
+    Client(RingBuffer<ClientMessage>& buffer, size_t client_id, size_t message_cnt, size_t memory_space_size, AccessPattern pattern);
     void run();
 
 private:

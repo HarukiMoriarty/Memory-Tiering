@@ -11,11 +11,6 @@
 
 class ConfigParser {
 public:
-    struct ClientConfig {
-        AccessPattern pattern;
-        std::vector<size_t> tier_sizes;
-    };
-
     ConfigParser();
     bool parse(int argc, char* argv[]);
 

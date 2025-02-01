@@ -53,9 +53,9 @@ bool ConfigParser::parseServerConfig(const cxxopts::ParseResult& result) {
         return false;
     }
 
-    server_memory_config_.local_numa_size = mem_sizes[0];
-    server_memory_config_.remote_numa_size = (server_memory_config_.num_tiers == 3) ? mem_sizes[1] : 0;
-    server_memory_config_.pmem_size = mem_sizes.back();
+    server_memory_config_.local_numa_capacity = mem_sizes[0];
+    server_memory_config_.remote_numa_capacity = (server_memory_config_.num_tiers == 3) ? mem_sizes[1] : 0;
+    server_memory_config_.pmem_capacity = mem_sizes.back();
     return true;
 }
 
@@ -138,9 +138,9 @@ bool ConfigParser::validateMemoryConfiguration() {
     }
 
     const size_t* tier_limits[] = {
-        &server_memory_config_.local_numa_size,
-        &server_memory_config_.remote_numa_size,
-        &server_memory_config_.pmem_size
+        &server_memory_config_.local_numa_capacity,
+        &server_memory_config_.remote_numa_capacity,
+        &server_memory_config_.pmem_capacity
     };
 
     for (size_t i = 0; i < server_memory_config_.num_tiers; i++) {
@@ -164,9 +164,9 @@ void ConfigParser::printConfig() const {
     LOG_INFO("Memory Tier Sizes:");
     for (size_t i = 0; i < server_memory_config_.num_tiers; i++) {
         const size_t* sizes[] = {
-            &server_memory_config_.local_numa_size,
-            &server_memory_config_.remote_numa_size,
-            &server_memory_config_.pmem_size
+            &server_memory_config_.local_numa_capacity,
+            &server_memory_config_.remote_numa_capacity,
+            &server_memory_config_.pmem_capacity
         };
         LOG_INFO("  - " << getTierName(i, server_memory_config_.num_tiers) << ": " << *sizes[i] << " pages");
     }

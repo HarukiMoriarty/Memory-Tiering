@@ -33,7 +33,7 @@ REQUIRED_LIBS = cxxopts
 
 .PHONY: all clean directories check-libs
 
-all: check-libs directories $(TARGET)
+all: clean check-libs directories $(TARGET)
 
 check-libs:
 	@for lib in $(REQUIRED_LIBS); do \

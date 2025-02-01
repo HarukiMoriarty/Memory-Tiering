@@ -16,26 +16,26 @@ int main(int argc, char* argv[]) {
     }
 
     RingBuffer<ClientMessage> client_req_buffer(config.getBufferSize());
-    std::vector<size_t> memory_sizes;
     const auto& client_configs = config.getClientConfigs();
-    for (const auto& client_config : client_configs) {
-        memory_sizes.push_back(client_config.addr_space_size);
-    }
 
     RingBuffer<MemMoveReq> move_page_buffer(config.getBufferSize());
     ServerMemoryConfig server_config = config.getServerMemoryConfig();
     PolicyConfig policy_config = config.getPolicyConfig();
-    Server server(client_req_buffer, move_page_buffer, memory_sizes, server_config, policy_config);
+    Server server(client_req_buffer, move_page_buffer, client_configs, server_config, policy_config);
 
     std::vector<std::shared_ptr<Client>> clients;
     std::vector<boost::thread> client_threads;
     for (size_t i = 0; i < client_configs.size(); i++) {
         const auto& client_config = client_configs[i];
+        size_t client_page_size = 0;
+        for (size_t tier_size : client_config.tier_sizes) {
+            client_page_size += tier_size;
+        }
         auto client = std::make_shared<Client>(
             client_req_buffer,
             i,
             config.getMessageCount(),
-            client_config.addr_space_size,
+            client_page_size,
             client_config.pattern
         );
         clients.push_back(client);

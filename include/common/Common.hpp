@@ -3,7 +3,6 @@
 
 #include <string>
 #include <sstream>
-#include <random>
 
 /**
  * Defines the type of memory operation that can be performed
@@ -11,7 +10,7 @@
 enum class OperationType {
     READ,   // Read operation
     WRITE,  // Write operation
-    END //Ene operation
+    END //End operation
 };
 
 /**
@@ -53,13 +52,21 @@ inline std::ostream& operator<<(std::ostream& os, const PageLayer& layer) {
 }
 
 /**
+ * Configuration structure for client access pattern and loading setting
+ */
+struct ClientConfig {
+    AccessPattern pattern;
+    std::vector<size_t> tier_sizes;
+};
+
+/**
  * Configuration structure for server memory tiers
  */
 struct ServerMemoryConfig {
     size_t num_tiers;
-    size_t local_numa_size;   // Size of local NUMA memory
-    size_t remote_numa_size;  // Size of remote NUMA memory
-    size_t pmem_size;         // Size of persistent memory
+    size_t local_numa_capacity;   // Capacity of local NUMA memory
+    size_t remote_numa_capacity;  // Capacity of remote NUMA memory
+    size_t pmem_capacity;         // Capacity of persistent memory
 };
 
 struct PolicyConfig {
@@ -68,78 +75,23 @@ struct PolicyConfig {
 };
 
 /**
- * Generates memory access patterns according to specified distribution
- */
-class MemoryAccessGenerator {
-private:
-    AccessPattern pattern_;     // Type of access pattern to generate
-    std::mt19937 rng_;          // Random number generator
-    double memory_size_;        // Total memory size to generate accesses for
-
-public:
-    /**
-     * Constructor for memory access pattern generator
-     * @param pattern Access pattern type to use
-     * @param memory_size Total memory size for generating offsets
-     */
-    MemoryAccessGenerator(AccessPattern pattern, double memory_size)
-        : pattern_(pattern), memory_size_(memory_size) {
-        std::random_device rd;
-        rng_ = std::mt19937(rd());
-    }
-
-    /**
-     * Generates a memory offset according to the specified access pattern
-     * @return Generated memory offset
-     */
-    size_t generateOffset() {
-        std::uniform_real_distribution<double> uniform(0, 1.0);
-
-        switch (pattern_) {
-        case AccessPattern::UNIFORM: {
-            std::uniform_int_distribution<size_t> dist(0, memory_size_ - 1);
-            return dist(rng_);
-        }
-
-        case AccessPattern::SKEWED_70_20_10: {
-            double rand = uniform(rng_);
-            if (rand < 0.7) {
-                // 70% of accesses go to first 10% of memory (hot pages)
-                std::uniform_int_distribution<size_t> hot(0, memory_size_ * 0.1 - 1);
-                return hot(rng_);
-            }
-            else if (rand < 0.9) {
-                // 20% of accesses go to next 20% of memory (warm pages)
-                std::uniform_int_distribution<size_t> medium(memory_size_ * 0.1, memory_size_ * 0.3 - 1);
-                return medium(rng_);
-            }
-            else {
-                // 10% of accesses go to remaining 70% of memory (cold pages)
-                std::uniform_int_distribution<size_t> cold(memory_size_ * 0.3, memory_size_ - 1);
-                return cold(rng_);
-            }
-        }
-        }
-        return 0;
-    }
-};
-
-/**
  * Represents a message from a client containing memory operation details
  */
 struct ClientMessage {
     size_t client_id;        // Unique client identifier for the client
-    size_t offset;           // Page identifier offset to access
+    size_t pid;              // Page identifier to access
+    size_t p_offset;         // Access offset inside a page
     OperationType op_type;   // Type of operation to perform
 
     /**
      * Constructor for client message
      * @param id Client identifier
-     * @param off Page identifier offset
+     * @param pid Page identifier
+     * @param p_offset Offset in one page
      * @param op Operation type
      */
-    ClientMessage(size_t id, size_t off, OperationType op)
-        : client_id(id), offset(off), op_type(op) {
+    ClientMessage(size_t client_id, size_t pid, size_t p_offset, OperationType op_type)
+        : client_id(client_id), pid(pid), p_offset(p_offset), op_type(op_type) {
     }
 
     /**
@@ -149,7 +101,8 @@ struct ClientMessage {
     std::string toString() const {
         std::stringstream ss;
         ss << "Client " << client_id
-            << ", Offset: " << offset
+            << ", PageId: " << pid
+            << ", Offset: " << p_offset
             << ", Operation: " << (op_type == OperationType::READ ? "READ" : "WRITE");
         return ss.str();
     }

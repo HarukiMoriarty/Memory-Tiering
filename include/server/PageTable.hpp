@@ -20,7 +20,7 @@ struct PageMetadata {
 class PageTable {
 public:
     PageTable(size_t size);
-    void initPageTable(const std::vector<size_t>& client_addr_space, const ServerMemoryConfig& server_config, void* local_base, void* remote_base, void* pmem_base);
+    void initPageTable(const std::vector<ClientConfig>& client_configs, const ServerMemoryConfig& server_config, void* local_base, void* remote_base, void* pmem_base);
 
     // Read-only operations
     PageMetadata getPage(size_t index) const;

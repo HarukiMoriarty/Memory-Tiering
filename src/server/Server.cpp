@@ -7,29 +7,31 @@
 #include <boost/thread/thread.hpp> 
 
 Server::Server(RingBuffer<ClientMessage>& client_buffer, RingBuffer<MemMoveReq>& move_page_buffer,
-    const std::vector<size_t>& client_addr_space, const ServerMemoryConfig& server_config, const PolicyConfig& policy_config)
+    const std::vector<ClientConfig>& client_configs, const ServerMemoryConfig& server_config, const PolicyConfig& policy_config)
     : client_buffer_(client_buffer), move_page_buffer_(move_page_buffer), server_config_(server_config), policy_config_(policy_config) {
-    // Calculate base addresses for each client
-    size_t current_base = 0;
-    for (size_t size : client_addr_space) {
-        base_page_id_.push_back(current_base);
-        current_base += size;
+    // Calculate total load memory pages 
+    size_t load_pg_cnts = 0;
+    for (ClientConfig client : client_configs) {
+        base_page_id_.push_back(load_pg_cnts);
+        for (size_t size : client.tier_sizes) {
+            load_pg_cnts += size;
+        }
     }
 
     // Initialize flags for each client
-    client_done_flags_ = std::vector<bool>(client_addr_space.size(), false);
+    client_done_flags_ = std::vector<bool>(client_configs.size(), false);
 
     // Init PageTable with the total memory size
-    page_table_ = new PageTable(current_base);
+    page_table_ = new PageTable(load_pg_cnts);
     scanner_ = new Scanner(*page_table_);
 
     // Allocate memory based on the server config
-    allocateMemory(server_config);
+    allocateMemory(client_configs);
     // After allocating memory, generate random content in all tiers
     generateRandomContent();
 
     // Init page table of all memory tiers
-    page_table_->initPageTable(client_addr_space, server_config, local_base_, remote_base_, pmem_base_);
+    page_table_->initPageTable(client_configs, server_config, local_base_, remote_base_, pmem_base_);
 }
 
 Server::~Server() {
@@ -44,14 +46,23 @@ Server::~Server() {
     }
 }
 
-void Server::allocateMemory(const ServerMemoryConfig& config) {
-    // Store paras
-    local_page_count_ = config.local_numa_size;
-    remote_page_count_ = config.remote_numa_size;
-    pmem_page_count_ = config.pmem_size;
-    num_tiers_ = config.num_tiers;
+void Server::allocateMemory(const std::vector<ClientConfig>& client_configs) {
+    // Calculate total load memory pages for each tier
+    if (server_config_.num_tiers == 2) {
+        for (ClientConfig client : client_configs) {
+            local_page_count_ += client.tier_sizes[0];
+            pmem_page_count_ += client.tier_sizes[1];
+        }
+    }
+    else if (server_config_.num_tiers == 3) {
+        for (ClientConfig client : client_configs) {
+            local_page_count_ += client.tier_sizes[0];
+            remote_page_count_ += client.tier_sizes[1];
+            pmem_page_count_ += client.tier_sizes[2];
+        }
+    }
 
-    if (num_tiers_ == 2) {
+    if (server_config_.num_tiers == 2) {
         // For 2 tiers, combine local and remote NUMA memory into DRAM
         // Allocate local NUMA memory
         local_base_ = allocate_pages(PAGE_SIZE, local_page_count_ + remote_page_count_);
@@ -71,12 +82,12 @@ void Server::generateRandomContent() {
     // Seed the random number generator
     srand(static_cast<unsigned>(time(NULL)));
 
-    size_t local_size = (num_tiers_ == 2) ? (local_page_count_ + remote_page_count_) * PAGE_SIZE : local_page_count_ * PAGE_SIZE;
-    size_t remote_size = (num_tiers_ == 3) ? remote_page_count_ * PAGE_SIZE : 0;
+    size_t local_size = (server_config_.num_tiers == 2) ? (local_page_count_ + remote_page_count_) * PAGE_SIZE : local_page_count_ * PAGE_SIZE;
+    size_t remote_size = (server_config_.num_tiers == 3) ? remote_page_count_ * PAGE_SIZE : 0;
     size_t pmem_size = pmem_page_count_ * PAGE_SIZE;
 
     LOG_DEBUG("Local size: " << local_size);
-    if (num_tiers_ == 3) {
+    if (server_config_.num_tiers == 3) {
         LOG_DEBUG("Remote size: " << remote_size);
     }
     LOG_DEBUG("PMEM size: " << pmem_size);
@@ -91,7 +102,7 @@ void Server::generateRandomContent() {
     LOG_DEBUG("Random content generated for local numa node.");
 
     // Fill numa remote tier
-    if (num_tiers_ == 3) {
+    if (server_config_.num_tiers == 3) {
         unsigned char* base = static_cast<unsigned char*>(remote_base_);
         for (size_t i = 0; i < remote_size; i++) {
             base[i] = static_cast<unsigned char>(rand() % 256);
@@ -120,7 +131,7 @@ void Server::handleClientMessage(const ClientMessage& msg) {
         // Check if all clients are done
         if (std::all_of(client_done_flags_.begin(), client_done_flags_.end(), [](bool done) { return done; })) {
             LOG_INFO("All clients sent END command. Printing metrics...");
-            if (num_tiers_ == 3) { Metrics::getInstance().printMetricsThreeTiers(); }
+            if (server_config_.num_tiers == 3) { Metrics::getInstance().printMetricsThreeTiers(); }
             else {
                 Metrics::getInstance().printMetricsTwoTiers();
             }
@@ -129,9 +140,9 @@ void Server::handleClientMessage(const ClientMessage& msg) {
         return;
     }
 
-    size_t actual_id = base_page_id_[msg.client_id] + msg.offset;
-    size_t page_id = static_cast<size_t>(actual_id);
-    PageMetadata page_meta = page_table_->getPage(actual_id);
+    size_t page_id = base_page_id_[msg.client_id] + msg.pid;
+    PageMetadata page_meta = page_table_->getPage(page_id);
+    LOG_ERROR(page_id);
     page_table_->updateAccess(page_id);
 
     switch (page_meta.page_layer) {
@@ -206,7 +217,7 @@ void Server::handleMemoryMoveRequest(const MemMoveReq& req) {
 
 void Server::runManagerThread() {
     while (!shouldShutdown()) {
-        ClientMessage client_msg(0, 0, OperationType::READ);
+        ClientMessage client_msg(0, 0, 0, OperationType::READ);
         MemMoveReq move_msg(0, PageLayer::NUMA_LOCAL);
         bool didwork = false;
 
@@ -234,7 +245,7 @@ void Server::runManagerThread() {
 
 // Policy thread logic
 void Server::runPolicyThread() {
-    scanner_->runClassifier(move_page_buffer_, policy_config_.hot_access_cnt, boost::chrono::milliseconds(policy_config_.cold_access_interval), num_tiers_);
+    scanner_->runClassifier(move_page_buffer_, policy_config_.hot_access_cnt, boost::chrono::milliseconds(policy_config_.cold_access_interval), server_config_.num_tiers);
     LOG_DEBUG("Policy thread exiting...");
 }
 
