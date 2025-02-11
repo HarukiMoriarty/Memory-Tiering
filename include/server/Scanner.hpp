@@ -19,13 +19,13 @@ public:
     Scanner(PageTable& page_table);
 
     // Check if a single page is hot
-    bool classifyHotPage(const PageMetadata& page, size_t min_access_count) const;
+    bool classifyHotPage(const PageMetadata& page, boost::chrono::milliseconds time_threshold) const;
 
     // Check if a single page is cold
     bool classifyColdPage(const PageMetadata& page, boost::chrono::milliseconds time_threshold) const;
 
     // Continuously classify pages using scanNext()
-    void runClassifier(RingBuffer<MemMoveReq>& move_page_buffer, size_t min_access_count, boost::chrono::milliseconds time_threshold, size_t num_tiers);
+    void runClassifier(RingBuffer<MemMoveReq>& move_page_buffer, boost::chrono::milliseconds hot_time_threshold, boost::chrono::milliseconds cold_time_threshold, size_t num_tiers);
 
     // Stop the continuous classifier
     void stopClassifier();

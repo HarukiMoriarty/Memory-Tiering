@@ -27,7 +27,7 @@ ConfigParser::ConfigParser()
         ("c,client-tier-sizes", "Memory space size per tier per client (client1_local,client1_remote,client1_pmem ...)", cxxopts::value<std::vector<std::string>>())
         ("t,num-tiers", "Number of memory tiers", cxxopts::value<size_t>()->default_value("3"))
         ("s,mem-sizes", "Memory size in pages for each tier", cxxopts::value<std::vector<size_t>>())
-        ("hot-access-cnt", "Hot page threshold count", cxxopts::value<size_t>()->default_value("10"))
+        ("hot-access-interval", "Hot page interval (ms)", cxxopts::value<size_t>()->default_value("100"))
         ("cold-access-interval", "Cold page interval (ms)", cxxopts::value<size_t>()->default_value("1000"))
         ("h,help", "Print usage information");
 }
@@ -35,7 +35,7 @@ ConfigParser::ConfigParser()
 bool ConfigParser::parseBasicConfig(const cxxopts::ParseResult& result) {
     buffer_size_ = result["buffer-size"].as<size_t>();
     message_count_ = result["messages"].as<size_t>();
-    policy_config_.hot_access_cnt = result["hot-access-cnt"].as<size_t>();
+    policy_config_.hot_access_interval = result["hot-access-interval"].as<size_t>();
     policy_config_.cold_access_interval = result["cold-access-interval"].as<size_t>();
     server_memory_config_.num_tiers = result["num-tiers"].as<size_t>();
 
@@ -157,7 +157,7 @@ void ConfigParser::printConfig() const {
     LOG_INFO("Buffer Size: " << buffer_size_);
     LOG_INFO("Message Count: " << message_count_);
     LOG_INFO("Hot Page Policy:");
-    LOG_INFO("  - Hot Access Count: " << policy_config_.hot_access_cnt);
+    LOG_INFO("  - Hot Access Interval: " << policy_config_.hot_access_interval << " ms");
     LOG_INFO("  - Cold Access Interval: " << policy_config_.cold_access_interval << " ms");
     LOG_INFO("Number of Tiers: " << server_memory_config_.num_tiers);
 

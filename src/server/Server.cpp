@@ -261,7 +261,7 @@ void Server::runManagerThread() {
 
 // Policy thread logic
 void Server::runPolicyThread() {
-    scanner_->runClassifier(move_page_buffer_, policy_config_.hot_access_cnt, boost::chrono::milliseconds(policy_config_.cold_access_interval), server_config_.num_tiers);
+    scanner_->runClassifier(move_page_buffer_, boost::chrono::milliseconds(policy_config_.hot_access_interval), boost::chrono::milliseconds(policy_config_.cold_access_interval), server_config_.num_tiers);
     LOG_DEBUG("Policy thread exiting...");
 }
 

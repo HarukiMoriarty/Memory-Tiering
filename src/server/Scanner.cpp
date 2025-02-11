@@ -10,9 +10,12 @@ Scanner::Scanner(PageTable& page_table)
     : page_table_(page_table), running_(false) {
 }
 
-// Check if a page is hot based on both access count and time threshold
-bool Scanner::classifyHotPage(const PageMetadata& page, size_t min_access_count) const {
-    return page.access_count >= min_access_count;
+// Check if a page is hot based on time threshold
+bool Scanner::classifyHotPage(const PageMetadata& page, boost::chrono::milliseconds time_threshold) const {
+    auto current_time = boost::chrono::steady_clock::now();
+    auto time_since_last_access = boost::chrono::duration_cast<boost::chrono::milliseconds>(
+        current_time - page.last_access_time);
+    return time_since_last_access <= time_threshold;
 }
 
 // Check if a page is cold based on both access count and time threshold
@@ -24,7 +27,7 @@ bool Scanner::classifyColdPage(const PageMetadata& page, boost::chrono::millisec
 }
 
 // Continuously classify pages using scanNext()
-void Scanner::runClassifier(RingBuffer<MemMoveReq>& move_page_buffer, size_t min_access_count, boost::chrono::milliseconds time_threshold, size_t num_tiers) {
+void Scanner::runClassifier(RingBuffer<MemMoveReq>& move_page_buffer, boost::chrono::milliseconds hot_time_threshold, boost::chrono::milliseconds cold_time_threshold, size_t num_tiers) {
     running_ = true;
     while (running_) {
         size_t page_id = page_table_.getNextPageId();
@@ -34,7 +37,7 @@ void Scanner::runClassifier(RingBuffer<MemMoveReq>& move_page_buffer, size_t min
         case PageLayer::NUMA_LOCAL: {
             if (num_tiers == 2) {
                 // For two tiers, treat NUMA_LOCAL and NUMA_REMOTE as a single DRAM tier
-                if (classifyColdPage(page, time_threshold)) {
+                if (classifyColdPage(page, cold_time_threshold)) {
                     LOG_DEBUG("Cold page detected in DRAM: " << page.page_address);
                     MemMoveReq msg(page_id, PageLayer::PMEM);
                     while (!move_page_buffer.push(msg)) {
@@ -45,7 +48,7 @@ void Scanner::runClassifier(RingBuffer<MemMoveReq>& move_page_buffer, size_t min
             else {
                 // For three tiers, handle NUMA_LOCAL cold pages
                 // Only detect cold pages for local NUMA
-                if (classifyColdPage(page, time_threshold)) {
+                if (classifyColdPage(page, cold_time_threshold)) {
                     LOG_DEBUG("Cold page detected in NUMA_LOCAL: " << page.page_address);
                     MemMoveReq msg(page_id, PageLayer::NUMA_REMOTE);
                     while (!move_page_buffer.push(msg)) {
@@ -58,14 +61,14 @@ void Scanner::runClassifier(RingBuffer<MemMoveReq>& move_page_buffer, size_t min
 
         case PageLayer::NUMA_REMOTE: {
             // Check cold first, then hot if not cold
-            if (classifyColdPage(page, time_threshold)) {
+            if (classifyColdPage(page, cold_time_threshold)) {
                 LOG_DEBUG("Cold page detected in NUMA_REMOTE: " << page.page_address);
                 MemMoveReq msg(page_id, PageLayer::PMEM);
                 while (!move_page_buffer.push(msg)) {
                     boost::this_thread::sleep_for(boost::chrono::nanoseconds(100));
                 }
             }
-            else if (classifyHotPage(page, min_access_count)) {
+            else if (classifyHotPage(page, hot_time_threshold)) {
                 LOG_DEBUG("Hot page detected in NUMA_REMOTE: " << page.page_address);
                 MemMoveReq msg(page_id, PageLayer::NUMA_LOCAL);
                 while (!move_page_buffer.push(msg)) {
@@ -78,7 +81,7 @@ void Scanner::runClassifier(RingBuffer<MemMoveReq>& move_page_buffer, size_t min
         case PageLayer::PMEM: {
             // Only detect hot pages for PMEM
             LOG_DEBUG("Hot page detected in PMEM: " << page.page_address);
-            if (classifyHotPage(page, min_access_count)) {
+            if (classifyHotPage(page, hot_time_threshold)) {
                 if (num_tiers == 2) {
                     // Move hot pages from PMEM to DRAM in a two-tier setup
                     MemMoveReq msg(page_id, PageLayer::NUMA_LOCAL);

@@ -12,7 +12,6 @@ struct PageMetadata {
     void* page_address;
     PageLayer page_layer;
     boost::chrono::steady_clock::time_point last_access_time;
-    size_t access_count = 0;
 
     PageMetadata(void* addr = 0, PageLayer layer = PageLayer::NUMA_LOCAL);
 };
@@ -32,7 +31,6 @@ public:
     void updateAccess(size_t index);
     void updatePageLayer(size_t index, PageLayer new_layer);
     PageMetadata scanNext();
-    void resetAccessCount();
 
 private:
     std::vector<PageMetadata> table_;
