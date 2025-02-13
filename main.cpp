@@ -18,10 +18,9 @@ int main(int argc, char* argv[]) {
     RingBuffer<ClientMessage> client_req_buffer(config.getBufferSize());
     const auto& client_configs = config.getClientConfigs();
 
-    RingBuffer<MemMoveReq> move_page_buffer(config.getBufferSize());
     ServerMemoryConfig server_config = config.getServerMemoryConfig();
     PolicyConfig policy_config = config.getPolicyConfig();
-    Server server(client_req_buffer, move_page_buffer, client_configs, server_config, policy_config);
+    Server server(client_req_buffer, client_configs, server_config, policy_config);
 
     std::vector<std::shared_ptr<Client>> clients;
     std::vector<boost::thread> client_threads;

@@ -4,6 +4,8 @@
 #include <string>
 #include <sstream>
 
+#include "Logger.hpp"
+
 /**
  * Defines the type of memory operation that can be performed
  */
@@ -115,34 +117,6 @@ struct ClientMessage {
             << ", PageId: " << pid
             << ", Offset: " << p_offset
             << ", Operation: " << (op_type == OperationType::READ ? "READ" : "WRITE");
-        return ss.str();
-    }
-};
-
-/**
- * Represents a memory movement request between different memory tiers
- */
-struct MemMoveReq {
-    size_t page_id;     // Page identifier to move
-    PageLayer layer_id; // Destination layer for the page
-
-    /**
-     * Constructor for memory movement request
-     * @param page_id   Page identifier
-     * @param layer_id  Destination layer
-     */
-    MemMoveReq(size_t page_id, PageLayer layer_id)
-        : page_id(page_id), layer_id(layer_id) {
-    }
-
-    /**
-     * Converts request to string representation for logging/debugging
-     * @return String representation of the request
-     */
-    std::string toString() const {
-        std::stringstream ss;
-        ss << "Page " << page_id
-            << " to Layer: " << layer_id;
         return ss.str();
     }
 };

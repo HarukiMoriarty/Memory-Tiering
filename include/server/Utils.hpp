@@ -139,17 +139,15 @@ inline void* allocate_and_bind_to_numa(size_t size, size_t number, int numa_node
  * @param addr Page address
  * @param target_node Target NUMA node
  */
-inline uint64_t move_page_to_node(void* addr, int target_node) {
+inline void move_page_to_node(void* addr, int target_node) {
     void* pages[1] = { addr };
     int nodes[1] = { target_node };
     int status[1];
 
-    uint64_t start_time = get_time_ns();
     if (syscall(SYS_move_pages, 0, 1, pages, nodes, status, MPOL_MF_MOVE) != 0) {
         perror("move_pages failed");
         exit(EXIT_FAILURE);
     }
-    return (get_time_ns() - start_time);
 }
 
 /**
@@ -204,7 +202,7 @@ inline void move_pages_to_node(void* addr, size_t size, size_t number, int targe
  * @param current_tier Current memory tier
  * @param target_tier Target memory tier
  */
-inline uint64_t migrate_page(void* addr, PageLayer current_tier, PageLayer target_tier) {
+inline void migrate_page(void* addr, PageLayer current_tier, PageLayer target_tier) {
     int target_node = (target_tier == PageLayer::NUMA_LOCAL) ? 0 :
         (target_tier == PageLayer::NUMA_REMOTE) ? 1 : 2;
     return move_page_to_node(addr, target_node);

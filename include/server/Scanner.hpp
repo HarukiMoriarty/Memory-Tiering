@@ -25,7 +25,7 @@ public:
     bool classifyColdPage(const PageMetadata& page, boost::chrono::milliseconds time_threshold) const;
 
     // Continuously classify pages using scanNext()
-    void runClassifier(RingBuffer<MemMoveReq>& move_page_buffer, boost::chrono::milliseconds hot_time_threshold, boost::chrono::milliseconds cold_time_threshold, size_t num_tiers);
+    void runScanner(boost::chrono::milliseconds hot_time_threshold, boost::chrono::milliseconds cold_time_threshold, size_t num_tiers);
 
     // Stop the continuous classifier
     void stopClassifier();

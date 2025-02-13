@@ -23,13 +23,6 @@ void Metrics::printMetricsThreeTiers() const {
     LOG_INFO("  Local -> PMEM: " << local_to_pmem_count_.load());
     LOG_INFO("  PMEM -> Local: " << pmem_to_local_count_.load());
 
-    LOG_INFO("Migration Latency (ns):");
-    LOG_INFO("  Min:  " << acc::min(migration_latency_));  // Fixed: was using access_latency_
-    LOG_INFO("  P50:  " << acc::extended_p_square(migration_latency_)[1]);  // Fixed: was using access_latency_
-    LOG_INFO("  P99:  " << acc::extended_p_square(migration_latency_)[2]);  // Fixed: was using access_latency_
-    LOG_INFO("  Max:  " << acc::max(migration_latency_));
-    LOG_INFO("  Mean: " << acc::mean(migration_latency_));
-
     if (total_latency_.load() > 0) {
         LOG_INFO("Throughput:");
         uint64_t total_access = local_access_count_.load() + remote_access_count_.load() + pmem_access_count_.load();
@@ -56,13 +49,6 @@ void Metrics::printMetricsTwoTiers() const {
     LOG_INFO("  DRAM -> PMEM: " << local_to_pmem_count_.load());
     LOG_INFO("  PMEM -> DRAM: " << pmem_to_local_count_.load());
 
-    LOG_INFO("Migration Latency (ns):");
-    LOG_INFO("  Min:  " << acc::min(migration_latency_));
-    LOG_INFO("  P50:  " << acc::extended_p_square(migration_latency_)[1]);
-    LOG_INFO("  P99:  " << acc::extended_p_square(migration_latency_)[2]);
-    LOG_INFO("  Max:  " << acc::max(migration_latency_));
-    LOG_INFO("  Mean: " << acc::mean(migration_latency_));
-
     if (total_latency_.load() > 0) {
         LOG_INFO("Throughput:");
         uint64_t total_access = local_access_count_.load() + pmem_access_count_.load();
@@ -84,5 +70,4 @@ void Metrics::reset() {
     pmem_to_local_count_ = 0;
     total_latency_ = 0;
     access_latency_ = AccumulatorType{ acc::tag::extended_p_square::probabilities = probabilities };
-    migration_latency_ = AccumulatorType{ acc::tag::extended_p_square::probabilities = probabilities };
 }

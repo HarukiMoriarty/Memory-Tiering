@@ -6,9 +6,9 @@
 #include <boost/chrono.hpp>
 #include <boost/thread/thread.hpp> 
 
-Server::Server(RingBuffer<ClientMessage>& client_buffer, RingBuffer<MemMoveReq>& move_page_buffer,
-    const std::vector<ClientConfig>& client_configs, const ServerMemoryConfig& server_config, const PolicyConfig& policy_config)
-    : client_buffer_(client_buffer), move_page_buffer_(move_page_buffer), server_config_(server_config), policy_config_(policy_config) {
+Server::Server(RingBuffer<ClientMessage>& client_buffer, const std::vector<ClientConfig>& client_configs,
+    const ServerMemoryConfig& server_config, const PolicyConfig& policy_config)
+    : client_buffer_(client_buffer), server_config_(server_config), policy_config_(policy_config) {
     // Calculate load memory pages 
     if (server_config_.num_tiers == 2) {
         for (ClientConfig client : client_configs) {
@@ -34,7 +34,7 @@ Server::Server(RingBuffer<ClientMessage>& client_buffer, RingBuffer<MemMoveReq>&
     client_done_flags_ = std::vector<bool>(client_configs.size(), false);
 
     // Init PageTable with the total memory size
-    page_table_ = new PageTable(total_page_load);
+    page_table_ = new PageTable(total_page_load, server_config);
     scanner_ = new Scanner(*page_table_);
 
     // Allocate memory based on the server config
@@ -43,7 +43,7 @@ Server::Server(RingBuffer<ClientMessage>& client_buffer, RingBuffer<MemMoveReq>&
     generateRandomContent();
 
     // Init page table of all memory tiers
-    page_table_->initPageTable(client_configs, server_config, local_base_, remote_base_, pmem_base_);
+    page_table_->initPageTable(client_configs, local_base_, remote_base_, pmem_base_);
 }
 
 Server::~Server() {
@@ -119,8 +119,6 @@ void Server::generateRandomContent() {
 
 // Helper function to handle a ClientMessage
 void Server::handleClientMessage(const ClientMessage& msg) {
-    LOG_DEBUG("Server received: " << msg.toString());
-
     if (msg.op_type == OperationType::END) {
         client_done_flags_[msg.client_id] = true;
         LOG_DEBUG("Client " << msg.client_id << " sent END command.");
@@ -137,117 +135,24 @@ void Server::handleClientMessage(const ClientMessage& msg) {
         return;
     }
 
-    size_t page_id = base_page_id_[msg.client_id] + msg.pid;
-    PageMetadata page_meta = page_table_->getPage(page_id);
-    page_table_->updateAccess(page_id);
-
-    switch (page_meta.page_layer) {
-    case PageLayer::NUMA_LOCAL:
-        Metrics::getInstance().incrementLocalAccess();
-        break;
-    case PageLayer::NUMA_REMOTE:
-        Metrics::getInstance().incrementRemoteAccess();
-        break;
-    case PageLayer::PMEM:
-        Metrics::getInstance().incrementPmemAccess();
-        break;
-    }
-
-    // record access latency
-    uint64_t access_time;
+    size_t page_index = base_page_id_[msg.client_id] + msg.pid;
     if (msg.op_type == OperationType::READ) {
-        access_time = access_page(page_meta.page_address, READ);
+        page_table_->accessPage(page_index, READ);
     }
     else {
-        access_time = access_page(page_meta.page_address, WRITE);
+        page_table_->accessPage(page_index, WRITE);
     }
-    Metrics::getInstance().recordAccessLatency(access_time);
-    LOG_DEBUG("Access time: " << access_time << " ns");
-}
-
-// Helper function to handle a MemMoveReq
-void Server::handleMemoryMoveRequest(const MemMoveReq& req) {
-    LOG_DEBUG("Server received move request: " << req.toString());
-
-    size_t page_id = static_cast<size_t>(req.page_id);
-    PageMetadata page_meta = page_table_->getPage(page_id);
-    PageLayer target_node = req.layer_id;
-    PageLayer current_node = page_meta.page_layer;
-
-    if (current_node == target_node) {
-        LOG_WARN("Page " << page_id << " is already on the desired layer.");
-        return;
-    }
-
-    // Get target layer info
-    LayerInfo* target_info = nullptr;
-    LayerInfo* current_info = nullptr;
-
-    // Get layer info pointers
-    switch (target_node) {
-    case PageLayer::NUMA_LOCAL:  target_info = &server_config_.local_numa; break;
-    case PageLayer::NUMA_REMOTE: target_info = &server_config_.remote_numa; break;
-    case PageLayer::PMEM:        target_info = &server_config_.pmem; break;
-    }
-    switch (current_node) {
-    case PageLayer::NUMA_LOCAL:  current_info = &server_config_.local_numa; break;
-    case PageLayer::NUMA_REMOTE: current_info = &server_config_.remote_numa; break;
-    case PageLayer::PMEM:        current_info = &server_config_.pmem; break;
-    }
-
-    // Check capacity
-    if (target_info->isFull()) {
-        LOG_DEBUG(target_node << " is full, page mitigate is failed");
-        return;
-    }
-
-    // Update counters
-    current_info->count--;
-    target_info->count++;
-
-    // Update metrics
-    auto& metrics = Metrics::getInstance();
-    if (current_node == PageLayer::NUMA_LOCAL) {
-        if (target_node == PageLayer::NUMA_REMOTE) metrics.incrementLocalToRemote();
-        else if (target_node == PageLayer::PMEM) metrics.incrementLocalToPmem();
-    }
-    else if (current_node == PageLayer::NUMA_REMOTE) {
-        if (target_node == PageLayer::NUMA_LOCAL) metrics.incrementRemoteToLocal();
-        else if (target_node == PageLayer::PMEM) metrics.incrementRemoteToPmem();
-    }
-    else if (current_node == PageLayer::PMEM) {
-        if (target_node == PageLayer::NUMA_LOCAL) metrics.incrementPmemToLocal();
-        else if (target_node == PageLayer::NUMA_REMOTE) metrics.incrementPmemToRemote();
-    }
-
-    // Perform the page migration
-    LOG_DEBUG("Moving Page " << page_id << " from Node " << current_node << " to Node " << target_node << "...");
-    uint64_t migrate_time = migrate_page(page_meta.page_address, current_node, target_node);
-    metrics.recordMigrationLatency(migrate_time);
-    LOG_DEBUG("Migration time: " << migrate_time << " ns");
-
-    // Update the page layer in the PageTable
-    page_table_->updatePageLayer(page_id, req.layer_id);
-    LOG_DEBUG("Page " << page_id << " now on Layer " << req.layer_id);
 }
 
 void Server::runManagerThread() {
     while (!shouldShutdown()) {
         ClientMessage client_msg(0, 0, 0, OperationType::READ);
-        MemMoveReq move_msg(0, PageLayer::NUMA_LOCAL);
         bool didwork = false;
 
         // Get memory request from client
         if (client_buffer_.pop(client_msg)) {
             LOG_DEBUG("Server received: " << client_msg.toString());
             handleClientMessage(client_msg);
-            didwork = true;
-        }
-
-        // Get page move request from policy thread
-        if (move_page_buffer_.pop(move_msg)) {
-            LOG_DEBUG("Server received: " << move_msg.toString());
-            handleMemoryMoveRequest(move_msg);
             didwork = true;
         }
 
@@ -260,8 +165,8 @@ void Server::runManagerThread() {
 }
 
 // Policy thread logic
-void Server::runPolicyThread() {
-    scanner_->runClassifier(move_page_buffer_, boost::chrono::milliseconds(policy_config_.hot_access_interval), boost::chrono::milliseconds(policy_config_.cold_access_interval), server_config_.num_tiers);
+void Server::runScannerThread() {
+    scanner_->runScanner(boost::chrono::milliseconds(policy_config_.hot_access_interval), boost::chrono::milliseconds(policy_config_.cold_access_interval), server_config_.num_tiers);
     LOG_DEBUG("Policy thread exiting...");
 }
 
@@ -279,7 +184,7 @@ bool Server::shouldShutdown() {
 // Main function to start threads
 void Server::start() {
     boost::thread server_thread(&Server::runManagerThread, this);
-    boost::thread policy_thread(&Server::runPolicyThread, this);
+    boost::thread policy_thread(&Server::runScannerThread, this);
 
     // Join threads
     server_thread.join();

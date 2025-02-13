@@ -13,17 +13,16 @@
 
 class Server {
 public:
-    Server(RingBuffer<ClientMessage>& client_buffer, RingBuffer<MemMoveReq>& move_page_buffer_,
-        const std::vector<ClientConfig>& client_configs, const ServerMemoryConfig& server_config, const PolicyConfig& policy_config);
+    Server(RingBuffer<ClientMessage>& client_buffer, const std::vector<ClientConfig>& client_configs,
+        const ServerMemoryConfig& server_config, const PolicyConfig& policy_config);
     ~Server();
 
     // Allocates memory in all three tiers and stores base addresses
     void allocateMemory();
     void generateRandomContent();
     void handleClientMessage(const ClientMessage& msg);
-    void handleMemoryMoveRequest(const MemMoveReq& req);
     void runManagerThread();
-    void runPolicyThread();
+    void runScannerThread();
     void start();
 
     // Shutdown function
@@ -32,7 +31,6 @@ public:
 
 private:
     RingBuffer<ClientMessage>& client_buffer_;
-    RingBuffer<MemMoveReq>& move_page_buffer_;
 
     std::vector<size_t> base_page_id_;
     PageTable* page_table_;

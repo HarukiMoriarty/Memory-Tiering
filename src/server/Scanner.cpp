@@ -15,6 +15,7 @@ bool Scanner::classifyHotPage(const PageMetadata& page, boost::chrono::milliseco
     auto current_time = boost::chrono::steady_clock::now();
     auto time_since_last_access = boost::chrono::duration_cast<boost::chrono::milliseconds>(
         current_time - page.last_access_time);
+    LOG_DEBUG("Time since last access: " << time_since_last_access.count() << "ms (threshold: " << time_threshold.count() << "ms)");
     return time_since_last_access <= time_threshold;
 }
 
@@ -26,34 +27,27 @@ bool Scanner::classifyColdPage(const PageMetadata& page, boost::chrono::millisec
     return time_since_last_access >= time_threshold;
 }
 
-// Continuously classify pages using scanNext()
-void Scanner::runClassifier(RingBuffer<MemMoveReq>& move_page_buffer, boost::chrono::milliseconds hot_time_threshold, boost::chrono::milliseconds cold_time_threshold, size_t num_tiers) {
+// Continuously classify pages
+void Scanner::runScanner(boost::chrono::milliseconds hot_time_threshold, boost::chrono::milliseconds cold_time_threshold, size_t num_tiers) {
     running_ = true;
-    while (running_) {
-        size_t page_id = page_table_.getNextPageId();
-        PageMetadata page = page_table_.scanNext();
 
-        switch (page.page_layer) {
+    // Sleep for hot time thershold time.
+    boost::this_thread::sleep_for(hot_time_threshold);
+
+    while (running_) {
+        size_t page_id = page_table_.scanNext();
+        PageMetadata page_meta_data = page_table_.getPage(page_id);
+
+        switch (page_meta_data.page_layer) {
         case PageLayer::NUMA_LOCAL: {
-            if (num_tiers == 2) {
-                // For two tiers, treat NUMA_LOCAL and NUMA_REMOTE as a single DRAM tier
-                if (classifyColdPage(page, cold_time_threshold)) {
-                    LOG_DEBUG("Cold page detected in DRAM: " << page.page_address);
-                    MemMoveReq msg(page_id, PageLayer::PMEM);
-                    while (!move_page_buffer.push(msg)) {
-                        boost::this_thread::sleep_for(boost::chrono::nanoseconds(100));
-                    }
+            if (classifyColdPage(page_meta_data, cold_time_threshold)) {
+                LOG_DEBUG("Cold page detected in DRAM: " << page_id);
+                if (num_tiers == 2) {
+                    page_table_.migratePage(page_id, PageLayer::PMEM);
                 }
-            }
-            else {
-                // For three tiers, handle NUMA_LOCAL cold pages
-                // Only detect cold pages for local NUMA
-                if (classifyColdPage(page, cold_time_threshold)) {
-                    LOG_DEBUG("Cold page detected in NUMA_LOCAL: " << page.page_address);
-                    MemMoveReq msg(page_id, PageLayer::NUMA_REMOTE);
-                    while (!move_page_buffer.push(msg)) {
-                        boost::this_thread::sleep_for(boost::chrono::nanoseconds(100));
-                    }
+                else {
+                    page_table_.migratePage(page_id, PageLayer::NUMA_REMOTE);
+
                 }
             }
             break;
@@ -61,40 +55,28 @@ void Scanner::runClassifier(RingBuffer<MemMoveReq>& move_page_buffer, boost::chr
 
         case PageLayer::NUMA_REMOTE: {
             // Check cold first, then hot if not cold
-            if (classifyColdPage(page, cold_time_threshold)) {
-                LOG_DEBUG("Cold page detected in NUMA_REMOTE: " << page.page_address);
-                MemMoveReq msg(page_id, PageLayer::PMEM);
-                while (!move_page_buffer.push(msg)) {
-                    boost::this_thread::sleep_for(boost::chrono::nanoseconds(100));
-                }
+            if (classifyColdPage(page_meta_data, cold_time_threshold)) {
+                LOG_DEBUG("Cold page detected in NUMA_REMOTE: " << page_id);
+                page_table_.migratePage(page_id, PageLayer::PMEM);
             }
-            else if (classifyHotPage(page, hot_time_threshold)) {
-                LOG_DEBUG("Hot page detected in NUMA_REMOTE: " << page.page_address);
-                MemMoveReq msg(page_id, PageLayer::NUMA_LOCAL);
-                while (!move_page_buffer.push(msg)) {
-                    boost::this_thread::sleep_for(boost::chrono::nanoseconds(100));
-                }
+            else if (classifyHotPage(page_meta_data, hot_time_threshold)) {
+                LOG_DEBUG("Hot page detected in NUMA_REMOTE: " << page_id);
+                page_table_.migratePage(page_id, PageLayer::NUMA_LOCAL);
             }
             break;
         }
 
         case PageLayer::PMEM: {
             // Only detect hot pages for PMEM
-            LOG_DEBUG("Hot page detected in PMEM: " << page.page_address);
-            if (classifyHotPage(page, hot_time_threshold)) {
+            if (classifyHotPage(page_meta_data, hot_time_threshold)) {
+                LOG_DEBUG("Hot page detected in PMEM: " << page_id);
                 if (num_tiers == 2) {
                     // Move hot pages from PMEM to DRAM in a two-tier setup
-                    MemMoveReq msg(page_id, PageLayer::NUMA_LOCAL);
-                    while (!move_page_buffer.push(msg)) {
-                        boost::this_thread::sleep_for(boost::chrono::nanoseconds(100));
-                    }
+                    page_table_.migratePage(page_id, PageLayer::NUMA_LOCAL);
                 }
                 else {
                     // Move hot pages from PMEM to NUMA_REMOTE in a three-tier setup
-                    MemMoveReq msg(page_id, PageLayer::NUMA_REMOTE);
-                    while (!move_page_buffer.push(msg)) {
-                        boost::this_thread::sleep_for(boost::chrono::nanoseconds(100));
-                    }
+                    page_table_.migratePage(page_id, PageLayer::NUMA_REMOTE);
                 }
             }
             break;

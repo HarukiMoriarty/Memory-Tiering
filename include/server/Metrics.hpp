@@ -47,11 +47,6 @@ public:
         total_latency_ += latency_ns;
     }
 
-    inline void recordMigrationLatency(uint64_t latency_ns) {
-        migration_latency_(latency_ns);
-        total_latency_ += latency_ns;
-    }
-
     // Print current metrics (call periodically or at program end)
     void printMetricsThreeTiers() const;
     void printMetricsTwoTiers() const;
@@ -88,7 +83,6 @@ private:
     >;
 
     AccumulatorType access_latency_{ acc::tag::extended_p_square::probabilities = probabilities };
-    AccumulatorType migration_latency_{ acc::tag::extended_p_square::probabilities = probabilities };
 
     // Total latency tracking for throughput calculation
     std::atomic<uint64_t> total_latency_{ 0 };
