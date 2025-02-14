@@ -1,6 +1,11 @@
 #ifndef SERVER_H
 #define SERVER_H
 
+#include <boost/chrono.hpp>
+#include <boost/thread/lock_guard.hpp>
+#include <boost/thread/mutex.hpp>
+#include <boost/thread/thread.hpp> 
+#include <iostream>
 #include <string>
 
 #include "RingBuffer.hpp"
@@ -8,8 +13,8 @@
 #include "Scanner.hpp"
 #include "Common.hpp"
 #include "Utils.hpp"
-#include <boost/thread/mutex.hpp>
-#include <boost/thread/lock_guard.hpp>
+#include "Logger.hpp"
+#include "Metrics.hpp"
 
 class Server {
 public:
@@ -17,28 +22,32 @@ public:
         const ServerMemoryConfig& server_config, const PolicyConfig& policy_config);
     ~Server();
 
-    // Allocates memory in all three tiers and stores base addresses
+    // Allocates memory in all three tiers and stores base addresses.
     void allocateMemory();
+
+    // Generate random content for each page.
     void generateRandomContent();
+
     void handleClientMessage(const ClientMessage& msg);
     void runManagerThread();
     void runScannerThread();
     void start();
 
     // Shutdown function
-    void signalShutdown();  // Sets the shutdown flag
-    bool shouldShutdown();  // Checks the shutdown flag
+    void signalShutdown();
+    bool shouldShutdown();
 
 private:
     RingBuffer<ClientMessage>& client_buffer_;
-
-    std::vector<size_t> base_page_id_;
     PageTable* page_table_;
     Scanner* scanner_;
 
     ServerMemoryConfig server_config_;
     PolicyConfig policy_config_;
     std::vector<bool> client_done_flags_;
+
+    // Base page id for each memory layer
+    std::vector<size_t> base_page_id_;
 
     // Number of pages load in each tier
     size_t local_page_load_ = 0;
@@ -49,8 +58,8 @@ private:
     void* remote_base_ = nullptr;
     void* pmem_base_ = nullptr;
 
-    bool shutdown_flag_ = false;    // Shared shutdown flag
-    boost::mutex shutdown_mutex_;   // Protects the flag
+    bool shutdown_flag_ = false;
+    boost::mutex shutdown_mutex_;
 
 };
 

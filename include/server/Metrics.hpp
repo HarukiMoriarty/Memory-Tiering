@@ -11,6 +11,8 @@
 #include <boost/accumulators/statistics/extended_p_square.hpp>
 #include <fstream>
 
+#include "Logger.hpp"
+
 namespace acc = boost::accumulators;
 
 /**
@@ -85,7 +87,6 @@ private:
         acc::tag::extended_p_square
         >
     >;
-
     AccumulatorType access_latency_{ acc::tag::extended_p_square::probabilities = probabilities };
 
     // Total latency tracking for throughput calculation

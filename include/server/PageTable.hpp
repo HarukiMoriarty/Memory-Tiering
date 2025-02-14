@@ -3,6 +3,7 @@
 
 #include <boost/thread/shared_mutex.hpp>
 #include <boost/thread/locks.hpp>
+#include <boost/unordered_map.hpp>
 #include <vector>
 
 #include "Common.hpp"
@@ -22,25 +23,32 @@ struct PageMetadata {
     }
 };
 
+struct PageTableEntry {
+    PageMetadata metadata;
+    mutable boost::shared_mutex mutex;
+
+    PageTableEntry(void* addr = 0, PageLayer layer = PageLayer::NUMA_LOCAL)
+        : metadata(addr, layer) {
+    }
+};
+
 class PageTable {
 public:
     PageTable(size_t size, ServerMemoryConfig server_config);
     void initPageTable(const std::vector<ClientConfig>& client_configs, void* local_base, void* remote_base, void* pmem_base);
 
     // Read-only operations
-    PageMetadata getPage(size_t index);
+    PageMetadata getPage(size_t page_id);
     size_t size() const { return table_.size(); };
     size_t scanNext();
 
     // Write operations  
-    void accessPage(size_t index, mem_access_mode mode);
-    void migratePage(size_t page_index, PageLayer new_layer);
+    void accessPage(size_t page_id, mem_access_mode mode);
+    void migratePage(size_t page_id, PageLayer new_layer);
 
 private:
-    std::vector<PageMetadata> table_;
-    std::vector<boost::shared_mutex> mutexes_;
+    boost::unordered_map<size_t, PageTableEntry> table_;
     size_t scan_index_ = 0;
-
     ServerMemoryConfig server_config_;
 };
 

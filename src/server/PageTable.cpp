@@ -1,14 +1,11 @@
 #include "PageTable.hpp"
 
 PageTable::PageTable(size_t size, ServerMemoryConfig server_config) :
-    table_(size), mutexes_(size),
-    scan_index_(0), server_config_(server_config) {
+    table_(size), server_config_(server_config) {
 }
 
 void PageTable::initPageTable(const std::vector<ClientConfig>& client_configs, void* local_base, void* remote_base, void* pmem_base) {
-    // Now fill the page table with metadata
-    // We can fill in order: first all allocations for client 1 (local, remote, pmem),
-    // then client 2, etc.
+    // Fill in order: first all allocations for client 1 (local, remote, pmem), then client 2, etc.
 
     size_t current_index = 0;
     size_t local_offset_pages = 0;
@@ -18,8 +15,13 @@ void PageTable::initPageTable(const std::vector<ClientConfig>& client_configs, v
     auto fillPages = [&](PageLayer layer, size_t count, void* base, size_t& offset) {
         for (size_t i = 0; i < count; ++i) {
             char* addr = static_cast<char*>(base) + offset * PAGE_SIZE;
-            boost::unique_lock<boost::shared_mutex> lock(mutexes_[current_index]);
-            table_[current_index] = PageMetadata(static_cast<void*>(addr), layer);
+
+            table_.emplace(
+                std::piecewise_construct,
+                std::forward_as_tuple(current_index),
+                std::forward_as_tuple(static_cast<void*>(addr), layer)
+            );
+
             current_index++;
             offset++;
         }
@@ -44,14 +46,17 @@ void PageTable::initPageTable(const std::vector<ClientConfig>& client_configs, v
     }
 }
 
-PageMetadata PageTable::getPage(size_t index) {
-    if (index >= table_.size()) {
-        LOG_ERROR("Get Page metadata index " << index << " out of bounds");
+PageMetadata PageTable::getPage(size_t page_id) {
+    auto it = table_.find(page_id);
+    if (it == table_.end()) {
+        LOG_ERROR("Get Page metadata index " << page_id << " not found");
         return PageMetadata();
     }
-
-    boost::shared_lock<boost::shared_mutex> lock(mutexes_[index]);
-    return table_[index];
+    // This has an possible race condition:
+    // After scanning the metadata, this page is accessed. This might caused
+    // False cold page.
+    boost::shared_lock<boost::shared_mutex> lock(it->second.mutex);
+    return it->second.metadata;
 }
 
 size_t PageTable::scanNext() {
@@ -63,16 +68,18 @@ size_t PageTable::scanNext() {
     return current;
 }
 
-void PageTable::accessPage(size_t page_index, mem_access_mode mode) {
-    if (page_index >= table_.size()) {
-        LOG_ERROR("Update Page access index " << page_index << " out of bounds");
+void PageTable::accessPage(size_t page_id, mem_access_mode mode) {
+    auto it = table_.find(page_id);
+    if (it == table_.end()) {
+        LOG_ERROR("Update Page access index " << page_id << " not found");
         return;
     }
 
-    boost::shared_lock<boost::shared_mutex> shared_lock(mutexes_[page_index]);
-    PageMetadata page_meta_data = table_[page_index];
+    boost::unique_lock<boost::shared_mutex> unique_lock(it->second.mutex);
+    PageMetadata& page_meta_data = it->second.metadata;
     uint64_t access_time = access_page(page_meta_data.page_address, mode);
-    shared_lock.unlock();
+    page_meta_data.last_access_time = boost::chrono::steady_clock::now();
+    unique_lock.unlock();
 
     Metrics::getInstance().recordAccessLatency(access_time);
     switch (page_meta_data.page_layer) {
@@ -86,21 +93,18 @@ void PageTable::accessPage(size_t page_index, mem_access_mode mode) {
         Metrics::getInstance().incrementPmemAccess();
         break;
     }
-    LOG_DEBUG("Access time: " << access_time << " ns");
-
-    boost::unique_lock<boost::shared_mutex> lock(mutexes_[page_index]);
-    table_[page_index].last_access_time = boost::chrono::steady_clock::now();
+    LOG_DEBUG("Access " << page_id << " time: " << access_time << " ns");
 }
 
 void PageTable::migratePage(size_t page_index, PageLayer page_target_layer) {
-    if (page_index >= table_.size()) {
-        LOG_ERROR("Update Page layer index " << page_index << " out of bounds");
+    auto it = table_.find(page_index);
+    if (it == table_.end()) {
+        LOG_ERROR("Update Page layer index " << page_index << " not found");
         return;
     }
 
-    boost::unique_lock<boost::shared_mutex> unique_lock(mutexes_[page_index]);
-
-    PageMetadata page_meta_data = table_[page_index];
+    boost::unique_lock<boost::shared_mutex> unique_lock(it->second.mutex);
+    PageMetadata& page_meta_data = it->second.metadata;
     PageLayer page_current_layer = page_meta_data.page_layer;
 
     // Get target layer info
@@ -125,7 +129,18 @@ void PageTable::migratePage(size_t page_index, PageLayer page_target_layer) {
         return;
     }
 
-    // Update counters
+    // Perform the page migration
+    LOG_DEBUG("Moving Page " << page_index << " from Node " << page_current_layer << " to Node " << page_target_layer << "...");
+    migrate_page(page_meta_data.page_address, page_current_layer, page_target_layer);
+    // Maintain metadata
+    page_meta_data.page_layer = page_target_layer;
+    page_meta_data.last_access_time = boost::chrono::steady_clock::now();
+    LOG_DEBUG("Page " << page_index << " now on Layer " << page_target_layer);
+
+    unique_lock.unlock();
+
+    // Update counters, for now scanner run in single thread, we do not need 
+    // Protect layer info count.
     current_layer_info->count--;
     target_layer_info->count++;
 
@@ -143,13 +158,4 @@ void PageTable::migratePage(size_t page_index, PageLayer page_target_layer) {
         if (page_target_layer == PageLayer::NUMA_LOCAL) metrics.incrementPmemToLocal();
         else if (page_target_layer == PageLayer::NUMA_REMOTE) metrics.incrementPmemToRemote();
     }
-
-    // Perform the page migration
-    LOG_DEBUG("Moving Page " << page_index << " from Node " << page_current_layer << " to Node " << page_target_layer << "...");
-    migrate_page(page_meta_data.page_address, page_current_layer, page_target_layer);
-
-    // Maintain metadata
-    table_[page_index].page_layer = page_target_layer;
-    table_[page_index].last_access_time = boost::chrono::steady_clock::now();
-    LOG_DEBUG("Page " << page_index << " now on Layer " << page_target_layer);
 }

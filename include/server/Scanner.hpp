@@ -1,18 +1,22 @@
-#ifndef POLICY_CLASSIFIER_HPP
-#define POLICY_CLASSIFIER_HPP
+#ifndef SCANNER_HPP
+#define SCANNER_HPP
 
 #include "PageTable.hpp"
 #include "RingBuffer.hpp"
 #include "Common.hpp"
+#include "Logger.hpp"
 
 #include <chrono>
+#include <iostream>
+#include <boost/chrono.hpp>
+#include <boost/thread/thread.hpp> 
 
 class Server;
 
 class Scanner {
 private:
     PageTable& page_table_;
-    bool running_; // To control the continuous scanning process
+    bool running_;
 
 public:
     // Constructor
@@ -24,12 +28,12 @@ public:
     // Check if a single page is cold
     bool classifyColdPage(const PageMetadata& page, boost::chrono::milliseconds time_threshold) const;
 
-    // Continuously classify pages using scanNext()
+    // Continuously classify pages
     void runScanner(boost::chrono::milliseconds hot_time_threshold, boost::chrono::milliseconds cold_time_threshold, size_t num_tiers);
 
-    // Stop the continuous classifier
+    // Stop scanner
     void stopClassifier();
 
 };
 
-#endif // POLICY_CLASSIFIER_HPP
+#endif // SCANNER_HPP

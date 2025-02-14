@@ -1,5 +1,4 @@
 #include "Metrics.hpp"
-#include "Logger.hpp"
 
 void Metrics::printMetricsThreeTiers() const {
     LOG_INFO("======== Memory Access Metrics ========");
