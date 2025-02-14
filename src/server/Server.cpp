@@ -125,11 +125,7 @@ void Server::handleClientMessage(const ClientMessage& msg) {
 
         // Check if all clients are done
         if (std::all_of(client_done_flags_.begin(), client_done_flags_.end(), [](bool done) { return done; })) {
-            LOG_INFO("All clients sent END command. Printing metrics...");
-            if (server_config_.num_tiers == 3) { Metrics::getInstance().printMetricsThreeTiers(); }
-            else {
-                Metrics::getInstance().printMetricsTwoTiers();
-            }
+            LOG_INFO("All clients sent END command.");
             signalShutdown();  // Exit the server gracefully
         }
         return;

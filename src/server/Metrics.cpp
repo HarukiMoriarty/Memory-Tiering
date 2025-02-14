@@ -10,8 +10,15 @@ void Metrics::printMetricsThreeTiers() const {
 
     LOG_INFO("Access Latency (ns):");
     LOG_INFO("  Min:  " << acc::min(access_latency_));
-    LOG_INFO("  P50:  " << acc::extended_p_square(access_latency_)[1]);  // 50th percentile
-    LOG_INFO("  P99:  " << acc::extended_p_square(access_latency_)[2]);  // 99th percentile
+    LOG_INFO("  P10:  " << acc::extended_p_square(access_latency_)[0]);
+    LOG_INFO("  P20:  " << acc::extended_p_square(access_latency_)[1]);
+    LOG_INFO("  P30:  " << acc::extended_p_square(access_latency_)[2]);
+    LOG_INFO("  P40:  " << acc::extended_p_square(access_latency_)[3]);
+    LOG_INFO("  P50:  " << acc::extended_p_square(access_latency_)[4]);
+    LOG_INFO("  P60:  " << acc::extended_p_square(access_latency_)[5]);
+    LOG_INFO("  P70:  " << acc::extended_p_square(access_latency_)[6]);
+    LOG_INFO("  P80:  " << acc::extended_p_square(access_latency_)[7]);
+    LOG_INFO("  P90:  " << acc::extended_p_square(access_latency_)[8]);
     LOG_INFO("  Max:  " << acc::max(access_latency_));
     LOG_INFO("  Mean: " << acc::mean(access_latency_));
 
@@ -40,9 +47,16 @@ void Metrics::printMetricsTwoTiers() const {
 
     LOG_INFO("Access Latency (ns):");
     LOG_INFO("  Min:  " << acc::min(access_latency_));
-    LOG_INFO("  P50:  " << acc::extended_p_square(access_latency_)[1]);
-    LOG_INFO("  P99:  " << acc::extended_p_square(access_latency_)[2]);
-    LOG_INFO("  Max:  " << acc::max(access_latency_));
+    LOG_INFO("  P10:  " << acc::extended_p_square(access_latency_)[0]);
+    LOG_INFO("  P20:  " << acc::extended_p_square(access_latency_)[1]);
+    LOG_INFO("  P30:  " << acc::extended_p_square(access_latency_)[2]);
+    LOG_INFO("  P40:  " << acc::extended_p_square(access_latency_)[3]);
+    LOG_INFO("  P50:  " << acc::extended_p_square(access_latency_)[4]);
+    LOG_INFO("  P60:  " << acc::extended_p_square(access_latency_)[5]);
+    LOG_INFO("  P70:  " << acc::extended_p_square(access_latency_)[6]);
+    LOG_INFO("  P80:  " << acc::extended_p_square(access_latency_)[7]);
+    LOG_INFO("  P90:  " << acc::extended_p_square(access_latency_)[8]);
+    LOG_INFO("  Max   " << acc::max(access_latency_));
     LOG_INFO("  Mean: " << acc::mean(access_latency_));
 
     LOG_INFO("Migration Counts:");
@@ -56,6 +70,30 @@ void Metrics::printMetricsTwoTiers() const {
         LOG_INFO("  Throughput: " << throughput << " ops/sec");
     }
     LOG_INFO("==========================================");
+}
+
+void Metrics::outputLatencyCDFToFile(const std::string& filename) const {
+    std::ofstream outfile(filename);
+    if (!outfile) {
+        LOG_ERROR("Failed to open file: " << filename);
+        return;
+    }
+
+    // Write header
+    outfile << "percentile,latency_ns\n";
+
+    outfile << "Min," << acc::min(access_latency_) << "\n";
+    // Write each percentile point
+    for (size_t i = 0; i < std::size(probabilities); i++) {
+        double percentile = probabilities[i];
+        uint64_t latency = acc::extended_p_square(access_latency_)[i];
+        outfile << percentile << "," << latency << "\n";
+    }
+    outfile << "Max," << acc::max(access_latency_) << "\n";
+    outfile << "Mean," << acc::mean(access_latency_) << "\n";
+
+    outfile.close();
+    LOG_INFO("CDF data written to: " << filename);
 }
 
 void Metrics::reset() {

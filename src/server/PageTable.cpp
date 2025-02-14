@@ -20,7 +20,6 @@ void PageTable::initPageTable(const std::vector<ClientConfig>& client_configs, v
             char* addr = static_cast<char*>(base) + offset * PAGE_SIZE;
             boost::unique_lock<boost::shared_mutex> lock(mutexes_[current_index]);
             table_[current_index] = PageMetadata(static_cast<void*>(addr), layer);
-            LOG_DEBUG(current_index);
             current_index++;
             offset++;
         }

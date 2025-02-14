@@ -9,6 +9,7 @@
 #include <boost/accumulators/statistics/min.hpp>
 #include <boost/accumulators/statistics/max.hpp>
 #include <boost/accumulators/statistics/extended_p_square.hpp>
+#include <fstream>
 
 namespace acc = boost::accumulators;
 
@@ -50,6 +51,7 @@ public:
     // Print current metrics (call periodically or at program end)
     void printMetricsThreeTiers() const;
     void printMetricsTwoTiers() const;
+    void outputLatencyCDFToFile(const std::string& filename) const;
 
     // Reset all counters
     void reset();
@@ -71,7 +73,9 @@ private:
     std::atomic<uint64_t> pmem_to_local_count_{ 0 };
 
     // Latency tracking
-    static constexpr double probabilities[] = { 0.0, 0.50, 0.99 };
+    static constexpr double probabilities[] = {
+        0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9
+    };
 
     using AccumulatorType = acc::accumulator_set<uint64_t,
         acc::stats<

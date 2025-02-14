@@ -3,4 +3,5 @@
 build
 benchmark
 result
-.txt
+*.txt
+fig

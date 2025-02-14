@@ -6,6 +6,7 @@
 #include "ConfigParser.hpp"
 #include "Common.hpp"
 #include "Logger.hpp"
+#include "Metrics.hpp"
 
 int main(int argc, char* argv[]) {
     Logger::getInstance().init();
@@ -48,5 +49,10 @@ int main(int argc, char* argv[]) {
     }
     server_thread.join();
 
+    if (server_config.num_tiers == 3) { Metrics::getInstance().printMetricsThreeTiers(); }
+    else {
+        Metrics::getInstance().printMetricsTwoTiers();
+    }
+    Metrics::getInstance().outputLatencyCDFToFile(config.getLatencyOutputFile());
     return 0;
 }

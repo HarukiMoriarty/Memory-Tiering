@@ -29,6 +29,7 @@ ConfigParser::ConfigParser()
         ("s,mem-sizes", "Memory size in pages for each tier", cxxopts::value<std::vector<size_t>>())
         ("hot-access-interval", "Hot page interval (ms)", cxxopts::value<size_t>()->default_value("100"))
         ("cold-access-interval", "Cold page interval (ms)", cxxopts::value<size_t>()->default_value("1000"))
+        ("o,output", "Output file for access latency CDF data", cxxopts::value<std::string>()->default_value("result/latency.csv"))
         ("h,help", "Print usage information");
 }
 
@@ -38,6 +39,7 @@ bool ConfigParser::parseBasicConfig(const cxxopts::ParseResult& result) {
     policy_config_.hot_access_interval = result["hot-access-interval"].as<size_t>();
     policy_config_.cold_access_interval = result["cold-access-interval"].as<size_t>();
     server_memory_config_.num_tiers = result["num-tiers"].as<size_t>();
+    cdf_output_file_ = result["output"].as<std::string>();
 
     if (server_memory_config_.num_tiers < 2 || server_memory_config_.num_tiers > 3) {
         LOG_ERROR("Number of tiers must be between 2 and 3");
@@ -160,6 +162,7 @@ void ConfigParser::printConfig() const {
     LOG_INFO("  - Hot Access Interval: " << policy_config_.hot_access_interval << " ms");
     LOG_INFO("  - Cold Access Interval: " << policy_config_.cold_access_interval << " ms");
     LOG_INFO("Number of Tiers: " << server_memory_config_.num_tiers);
+    LOG_INFO("CDF Output File: " << cdf_output_file_);
 
     LOG_INFO("Memory Tier Sizes:");
     for (size_t i = 0; i < server_memory_config_.num_tiers; i++) {

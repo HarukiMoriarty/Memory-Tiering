@@ -20,6 +20,7 @@ public:
     const std::vector<ClientConfig>& getClientConfigs() const { return client_configs_; }
     const ServerMemoryConfig& getServerMemoryConfig() const { return server_memory_config_; }
     const PolicyConfig& getPolicyConfig() const { return policy_config_; }
+    const std::string& getLatencyOutputFile() const { return cdf_output_file_; }
 
     bool isHelpRequested() const { return help_requested_; }
 
@@ -40,6 +41,7 @@ private:
     std::vector<ClientConfig> client_configs_;
     ServerMemoryConfig server_memory_config_;
     PolicyConfig policy_config_;
+    std::string cdf_output_file_;
     bool help_requested_;
 };
 
