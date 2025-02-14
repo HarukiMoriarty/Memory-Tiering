@@ -34,8 +34,10 @@ struct PageTableEntry {
 
 class PageTable {
 public:
-    PageTable(size_t size, ServerMemoryConfig server_config);
-    void initPageTable(const std::vector<ClientConfig>& client_configs, void* local_base, void* remote_base, void* pmem_base);
+    PageTable(const std::vector<ClientConfig>& client_configs, const ServerMemoryConfig server_config);
+    ~PageTable();
+
+    void initPageTable();
 
     // Read-only operations
     PageMetadata getPage(size_t page_id);
@@ -47,9 +49,23 @@ public:
     void migratePage(size_t page_id, PageLayer new_layer);
 
 private:
-    boost::unordered_map<size_t, PageTableEntry> table_;
-    size_t scan_index_ = 0;
+    void _allocateMemory();
+    void _generateRandomContent();
+
+    std::vector<ClientConfig> client_configs_;
     ServerMemoryConfig server_config_;
+
+    boost::unordered_map<size_t, PageTableEntry> table_;
+
+    void* local_base_ = nullptr;
+    void* remote_base_ = nullptr;
+    void* pmem_base_ = nullptr;
+
+    size_t local_page_load_ = 0;
+    size_t remote_page_load_ = 0;
+    size_t pmem_page_load_ = 0;
+
+    size_t scan_index_ = 0;
 };
 
 #endif // PAGETABLE_H

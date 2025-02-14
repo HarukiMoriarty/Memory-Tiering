@@ -16,7 +16,11 @@ class Server;
 class Scanner {
 private:
     PageTable& page_table_;
-    bool running_;
+
+    bool scanner_shutdown_flag_ = false;
+    boost::mutex scanner_shutdown_mutex_;
+
+    bool _shouldShutdown();
 
 public:
     // Constructor
@@ -32,7 +36,7 @@ public:
     void runScanner(boost::chrono::milliseconds hot_time_threshold, boost::chrono::milliseconds cold_time_threshold, size_t num_tiers);
 
     // Stop scanner
-    void stopClassifier();
+    void signalShutdown();
 
 };
 

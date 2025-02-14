@@ -1,6 +1,6 @@
 #include "Scanner.hpp"
 
-Scanner::Scanner(PageTable& page_table) : page_table_(page_table), running_(false) {
+Scanner::Scanner(PageTable& page_table) : page_table_(page_table) {
 }
 
 // Check if a page is hot based on time threshold
@@ -19,13 +19,11 @@ bool Scanner::classifyColdPage(const PageMetadata& page, boost::chrono::millisec
 
 // Continuously classify pages
 void Scanner::runScanner(boost::chrono::milliseconds hot_time_threshold, boost::chrono::milliseconds cold_time_threshold, size_t num_tiers) {
-    running_ = true;
-
     // Sleep for hot time thershold time, make sure loaded page will not be 
     // classified as hot page.
     boost::this_thread::sleep_for(hot_time_threshold);
 
-    while (running_) {
+    while (!_shouldShutdown()) {
         // We are safe to use shared lock to get meta data here,
         // even if the info is changed before classification.
         size_t page_id = page_table_.scanNext();
@@ -81,7 +79,12 @@ void Scanner::runScanner(boost::chrono::milliseconds hot_time_threshold, boost::
     }
 }
 
+bool Scanner::_shouldShutdown() {
+    boost::lock_guard<boost::mutex> lock(scanner_shutdown_mutex_);
+    return scanner_shutdown_flag_;
+}
 
-void Scanner::stopClassifier() {
-    running_ = false;
+void Scanner::signalShutdown() {
+    boost::lock_guard<boost::mutex> lock(scanner_shutdown_mutex_);
+    scanner_shutdown_flag_ = true;
 }

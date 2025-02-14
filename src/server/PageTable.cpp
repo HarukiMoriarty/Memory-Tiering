@@ -1,11 +1,42 @@
 #include "PageTable.hpp"
 
-PageTable::PageTable(size_t size, ServerMemoryConfig server_config) :
-    table_(size), server_config_(server_config) {
+PageTable::PageTable(const std::vector<ClientConfig>& client_configs, ServerMemoryConfig server_config) :
+    client_configs_(client_configs), server_config_(server_config) {
+    if (server_config_.num_tiers == 2) {
+        for (ClientConfig client : client_configs) {
+            local_page_load_ += client.tier_sizes[0];
+            pmem_page_load_ += client.tier_sizes[1];
+        }
+    }
+    else if (server_config_.num_tiers == 3) {
+        for (ClientConfig client : client_configs) {
+            local_page_load_ += client.tier_sizes[0];
+            remote_page_load_ += client.tier_sizes[1];
+            pmem_page_load_ += client.tier_sizes[2];
+        }
+    }
+    server_config_.local_numa.count = local_page_load_;
+    server_config_.remote_numa.count = remote_page_load_;
+    server_config_.pmem.count = pmem_page_load_;
 }
 
-void PageTable::initPageTable(const std::vector<ClientConfig>& client_configs, void* local_base, void* remote_base, void* pmem_base) {
+PageTable::~PageTable() {
+    table_.clear();
+    if (local_base_) {
+        munmap(local_base_, local_page_load_ * PAGE_SIZE);
+    }
+    if (remote_base_) {
+        munmap(remote_base_, remote_page_load_ * PAGE_SIZE);
+    }
+    if (pmem_base_) {
+        munmap(pmem_base_, pmem_page_load_ * PAGE_SIZE);
+    }
+}
+
+void PageTable::initPageTable() {
     // Fill in order: first all allocations for client 1 (local, remote, pmem), then client 2, etc.
+    _allocateMemory();
+    _generateRandomContent();
 
     size_t current_index = 0;
     size_t local_offset_pages = 0;
@@ -28,19 +59,19 @@ void PageTable::initPageTable(const std::vector<ClientConfig>& client_configs, v
         LOG_DEBUG("Filled " << count << " pages for layer " << static_cast<int>(layer));
         };
 
-    for (ClientConfig client : client_configs) {
+    for (ClientConfig client : client_configs_) {
         if (server_config_.num_tiers == 2) {
-            fillPages(PageLayer::NUMA_LOCAL, client.tier_sizes[0], local_base, local_offset_pages);
+            fillPages(PageLayer::NUMA_LOCAL, client.tier_sizes[0], local_base_, local_offset_pages);
             server_config_.local_numa.count += client.tier_sizes[0];
-            fillPages(PageLayer::PMEM, client.tier_sizes[1], pmem_base, pmem_offset_pages);
+            fillPages(PageLayer::PMEM, client.tier_sizes[1], pmem_base_, pmem_offset_pages);
             server_config_.pmem.count += client.tier_sizes[1];
         }
         else if (server_config_.num_tiers == 3) {
-            fillPages(PageLayer::NUMA_LOCAL, client.tier_sizes[0], local_base, local_offset_pages);
+            fillPages(PageLayer::NUMA_LOCAL, client.tier_sizes[0], local_base_, local_offset_pages);
             server_config_.local_numa.count += client.tier_sizes[0];
-            fillPages(PageLayer::NUMA_REMOTE, client.tier_sizes[1], remote_base, remote_offset_pages);
+            fillPages(PageLayer::NUMA_REMOTE, client.tier_sizes[1], remote_base_, remote_offset_pages);
             server_config_.remote_numa.count += client.tier_sizes[1];
-            fillPages(PageLayer::PMEM, client.tier_sizes[2], pmem_base, pmem_offset_pages);
+            fillPages(PageLayer::PMEM, client.tier_sizes[2], pmem_base_, pmem_offset_pages);
             server_config_.pmem.count += client.tier_sizes[2];
         }
     }
@@ -157,5 +188,64 @@ void PageTable::migratePage(size_t page_index, PageLayer page_target_layer) {
     else if (page_current_layer == PageLayer::PMEM) {
         if (page_target_layer == PageLayer::NUMA_LOCAL) metrics.incrementPmemToLocal();
         else if (page_target_layer == PageLayer::NUMA_REMOTE) metrics.incrementPmemToRemote();
+    }
+}
+
+void PageTable::_allocateMemory() {
+    if (server_config_.num_tiers == 2) {
+        // For 2 tiers, combine local and remote NUMA memory into DRAM
+        // Allocate local NUMA memory
+        local_base_ = allocate_pages(PAGE_SIZE, local_page_load_ + remote_page_load_);
+    }
+    else {
+        // Allocate local NUMA memory
+        local_base_ = allocate_and_bind_to_numa(PAGE_SIZE, local_page_load_, 0);
+        // Allocate memory for remote NUMA pages 
+        remote_base_ = allocate_and_bind_to_numa(PAGE_SIZE, remote_page_load_, 1);
+    }
+
+    // Allocate PMEM memory
+    pmem_base_ = allocate_and_bind_to_numa(PAGE_SIZE, pmem_page_load_, 2);
+}
+
+void PageTable::_generateRandomContent() {
+    // Seed the random number generator
+    srand(static_cast<unsigned>(time(NULL)));
+
+    size_t local_size = (server_config_.num_tiers == 2) ? (local_page_load_ + remote_page_load_) * PAGE_SIZE : local_page_load_ * PAGE_SIZE;
+    size_t remote_size = (server_config_.num_tiers == 3) ? remote_page_load_ * PAGE_SIZE : 0;
+    size_t pmem_size = pmem_page_load_ * PAGE_SIZE;
+
+    LOG_DEBUG("Local size: " << local_size);
+    if (server_config_.num_tiers == 3) {
+        LOG_DEBUG("Remote size: " << remote_size);
+    }
+    LOG_DEBUG("PMEM size: " << pmem_size);
+
+    // Fill numa local tier
+    {
+        unsigned char* base = static_cast<unsigned char*>(local_base_);
+        for (size_t i = 0; i < local_size; i++) {
+            base[i] = static_cast<unsigned char>(rand() % 256);
+        }
+    }
+    LOG_DEBUG("Random content generated for local numa node.");
+
+    // Fill numa remote tier
+    if (server_config_.num_tiers == 3) {
+        unsigned char* base = static_cast<unsigned char*>(remote_base_);
+        for (size_t i = 0; i < remote_size; i++) {
+            base[i] = static_cast<unsigned char>(rand() % 256);
+        }
+        LOG_DEBUG("Random content generated for remote NUMA node.");
+    }
+
+    // Fill pmem tier
+    {
+        unsigned char* base = static_cast<unsigned char*>(pmem_base_);
+        for (size_t i = 0; i < pmem_size; i++) {
+            base[i] = static_cast<unsigned char>(rand() % 256);
+        }
+        LOG_DEBUG("Random content generated for persistent memory.");
     }
 }
