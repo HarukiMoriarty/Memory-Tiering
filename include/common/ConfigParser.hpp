@@ -21,6 +21,7 @@ public:
     const ServerMemoryConfig& getServerMemoryConfig() const { return server_memory_config_; }
     const PolicyConfig& getPolicyConfig() const { return policy_config_; }
     const std::string& getLatencyOutputFile() const { return cdf_output_file_; }
+    const double& getRwRatio() const { return rw_ratio_; }
 
     bool isHelpRequested() const { return help_requested_; }
 
@@ -40,6 +41,7 @@ private:
     size_t message_count_;
     std::vector<ClientConfig> client_configs_;
     ServerMemoryConfig server_memory_config_;
+    double rw_ratio_;
     PolicyConfig policy_config_;
     std::string cdf_output_file_;
     bool help_requested_;

@@ -36,7 +36,8 @@ int main(int argc, char* argv[]) {
             i,
             config.getMessageCount(),
             client_page_size,
-            client_config.pattern
+            client_config.pattern,
+            config.getRwRatio()
         );
         clients.push_back(client);
         client_threads.emplace_back([client]() { client->run(); });

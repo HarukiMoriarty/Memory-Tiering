@@ -36,3 +36,10 @@ size_t MemoryAccessGenerator::generatePid() {
     }
     return 0;
 }
+
+OperationType MemoryAccessGenerator::generateType(double rw_ratio) {
+    if (type_dis(rng_) < rw_ratio) {
+        return OperationType::READ;
+    }
+    return OperationType::WRITE;
+}

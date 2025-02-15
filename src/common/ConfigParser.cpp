@@ -22,14 +22,15 @@ ConfigParser::ConfigParser()
 
     options_.add_options()
         ("b,buffer-size", "Size of ring buffer", cxxopts::value<size_t>()->default_value("10"))
-        ("m,messages", "Number of messages per client", cxxopts::value<size_t>()->default_value("100"))
-        ("p,patterns", "Memory access patterns for each client (uniform/skewed)", cxxopts::value<std::vector<std::string>>())
         ("c,client-tier-sizes", "Memory space size per tier per client (client1_local,client1_remote,client1_pmem ...)", cxxopts::value<std::vector<std::string>>())
-        ("t,num-tiers", "Number of memory tiers", cxxopts::value<size_t>()->default_value("3"))
-        ("s,mem-sizes", "Memory size in pages for each tier", cxxopts::value<std::vector<size_t>>())
-        ("hot-access-interval", "Hot page interval (ms)", cxxopts::value<size_t>()->default_value("100"))
         ("cold-access-interval", "Cold page interval (ms)", cxxopts::value<size_t>()->default_value("1000"))
+        ("hot-access-interval", "Hot page interval (ms)", cxxopts::value<size_t>()->default_value("100"))
+        ("m,messages", "Number of messages per client", cxxopts::value<size_t>()->default_value("100"))
         ("o,output", "Output file for access latency CDF data", cxxopts::value<std::string>()->default_value("result/latency.csv"))
+        ("p,patterns", "Memory access patterns for each client (uniform/skewed)", cxxopts::value<std::vector<std::string>>())
+        ("r,ratio", "Memory access read/write ratio", cxxopts::value<double>()->default_value("1.0"))
+        ("s,mem-sizes", "Memory size in pages for each tier", cxxopts::value<std::vector<size_t>>())
+        ("t,num-tiers", "Number of memory tiers", cxxopts::value<size_t>()->default_value("3"))
         ("h,help", "Print usage information");
 }
 
@@ -40,6 +41,7 @@ bool ConfigParser::parseBasicConfig(const cxxopts::ParseResult& result) {
     policy_config_.cold_access_interval = result["cold-access-interval"].as<size_t>();
     server_memory_config_.num_tiers = result["num-tiers"].as<size_t>();
     cdf_output_file_ = result["output"].as<std::string>();
+    rw_ratio_ = result["ratio"].as<double>();
 
     if (server_memory_config_.num_tiers < 2 || server_memory_config_.num_tiers > 3) {
         LOG_ERROR("Number of tiers must be between 2 and 3");
@@ -158,6 +160,7 @@ void ConfigParser::printConfig() const {
     LOG_INFO("========== Configuration Parameters ==========");
     LOG_INFO("Buffer Size: " << buffer_size_);
     LOG_INFO("Message Count: " << message_count_);
+    LOG_INFO("Read/Write Ratio: " << rw_ratio_);
     LOG_INFO("Hot Page Policy:");
     LOG_INFO("  - Hot Access Interval: " << policy_config_.hot_access_interval << " ms");
     LOG_INFO("  - Cold Access Interval: " << policy_config_.cold_access_interval << " ms");
