@@ -14,6 +14,10 @@ private:
     double memory_space_size_;          // Total memory size to generate accesses for
     std::uniform_real_distribution<double> type_dis{ 0.0, 1.0 };
 
+    // index -> page id
+    std::unordered_map<size_t, size_t> hot_pages_;
+    std::unordered_map<size_t, size_t> warm_pages_;
+    std::unordered_map<size_t, size_t> cold_pages_;
 public:
     /**
      * Constructor for memory access pattern generator
