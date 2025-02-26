@@ -1,5 +1,3 @@
-#include <boost/thread/thread.hpp>
-
 #include "Client.hpp"
 #include "Server.hpp"
 #include "RingBuffer.hpp"
@@ -23,6 +21,10 @@ int main(int argc, char* argv[]) {
     PolicyConfig policy_config = config.getPolicyConfig();
     Server server(client_req_buffer, client_configs, server_config, policy_config);
 
+    // Sleep for hot time thershold time, make sure loaded page will not be 
+    // classified as hot page.
+    boost::this_thread::sleep_for(boost::chrono::milliseconds(policy_config.hot_access_interval));
+
     std::vector<std::shared_ptr<Client>> clients;
     std::vector<boost::thread> client_threads;
     for (size_t i = 0; i < client_configs.size(); i++) {
@@ -34,7 +36,7 @@ int main(int argc, char* argv[]) {
         auto client = std::make_shared<Client>(
             client_req_buffer,
             i,
-            config.getMessageCount(),
+            config.getRunningTime(),
             client_page_size,
             client_config.pattern,
             config.getRwRatio()
