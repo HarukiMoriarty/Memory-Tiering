@@ -6,7 +6,7 @@ MemoryAccessGenerator::MemoryAccessGenerator(AccessPattern pattern,
   std::random_device rd;
   rng_ = std::mt19937(rd());
 
-  // Pre-generate 70-20-10 page locations
+  // Pre-generation skewed distribution
   if (pattern == AccessPattern::SKEWED_70_20_10) {
     std::vector<size_t> all_pages(memory_space_size_);
     for (size_t i = 0; i < memory_space_size_; i++) {
@@ -44,24 +44,10 @@ size_t MemoryAccessGenerator::generatePid() {
   }
 
   case AccessPattern::SKEWED_70_20_10: {
-    double rand = uniform(rng_);
-    std::uniform_int_distribution<size_t> full_range(0, memory_space_size_ - 1);
-
-    if (rand < 0.7) {
-      // 70% of accesses go to first 10% of memory (hot pages)
-      std::uniform_int_distribution<size_t> hot_dist(0, hot_pages_.size() - 1);
-      return hot_pages_[hot_dist(rng_)];
-    } else if (rand < 0.9) {
-      // 20% of accesses go to next 20% of memory (warm pages)
-      std::uniform_int_distribution<size_t> warm_dist(0,
-                                                      warm_pages_.size() - 1);
-      return warm_pages_[warm_dist(rng_)];
-    } else {
-      // 10% of accesses go to remaining 70% of memory (cold pages)
-      std::uniform_int_distribution<size_t> cold_dist(0,
-                                                      cold_pages_.size() - 1);
-      return cold_pages_[cold_dist(rng_)];
-    }
+    // Now we just assume all the access come to 20% pages
+    // TODO: 70-20-10
+    std::uniform_int_distribution<size_t> warm_dist(0, warm_pages_.size() - 1);
+    return warm_pages_[warm_dist(rng_)];
   }
   }
   return 0;

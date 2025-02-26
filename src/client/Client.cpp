@@ -12,6 +12,7 @@ Client::Client(size_t client_id, RingBuffer<ClientMessage> &buffer,
       generator_(pattern, memory_space_size), rw_ratio_(rw_ratio) {}
 
 void Client::run() {
+  // Set running duration
   boost::chrono::steady_clock::time_point start_time =
       boost::chrono::steady_clock::now();
   boost::chrono::seconds total_duration(running_time_);
@@ -26,22 +27,20 @@ void Client::run() {
       break;
     }
 
-    size_t pid = generator_.generatePid();
     // TODO: for now we do not generate offset
-    size_t p_offset = 0;
-    OperationType op = generator_.generateType(rw_ratio_);
-
-    ClientMessage msg(client_id_, pid, p_offset, op);
+    ClientMessage msg(client_id_, generator_.generatePid(), 0,
+                      generator_.generateType(rw_ratio_));
     while (!buffer_.push(msg)) {
       boost::this_thread::sleep_for(boost::chrono::nanoseconds(100));
     }
 
-    LOG_DEBUG("Client sent: " << msg.toString());
+    LOG_DEBUG("client " << client_id_ << "sent: " << msg.toString());
   }
 
+  // Send last message to notify server
   ClientMessage end_msg(client_id_, 0, 0, OperationType::END);
   while (!buffer_.push(end_msg)) {
     boost::this_thread::sleep_for(boost::chrono::nanoseconds(100));
   }
-  LOG_DEBUG("Client sent END message.");
+  LOG_DEBUG("client " << client_id_ << "sent: END");
 }
