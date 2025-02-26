@@ -30,15 +30,14 @@ public:
   bool isHelpRequested() const { return help_requested_; }
 
 private:
-  bool parseBasicConfig(const cxxopts::ParseResult &result);
-  bool parseServerConfig(const cxxopts::ParseResult &result);
-  bool parseClientConfigs(const std::vector<std::string> &patterns,
-                          const std::vector<std::string> &tier_sizes);
-  bool validateMemoryConfiguration();
-  void printConfig() const;
+  bool _parseBasicConfig(const cxxopts::ParseResult &result);
+  bool _parseServerConfig(const cxxopts::ParseResult &result);
+  bool _parseClientConfigs(const cxxopts::ParseResult &result);
+  bool _validateMemoryConfiguration();
+  void _printConfig() const;
 
-  static std::vector<std::string> split(const std::string &s, char delim);
-  static std::string getTierName(size_t tier_idx, size_t num_tiers);
+  static std::vector<std::string> _split(const std::string &s, char delim);
+  static std::string _getTierName(size_t tier_idx, size_t num_tiers);
 
   cxxopts::Options options_;
   bool help_requested_;

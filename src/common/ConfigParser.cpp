@@ -1,7 +1,8 @@
 #include "ConfigParser.hpp"
 #include "Logger.hpp"
 
-std::vector<std::string> ConfigParser::split(const std::string &s, char delim) {
+std::vector<std::string> ConfigParser::_split(const std::string &s,
+                                              char delim) {
   std::vector<std::string> result;
   std::stringstream ss(s);
   std::string item;
@@ -43,7 +44,7 @@ ConfigParser::ConfigParser()
                                                     "Print usage information");
 }
 
-bool ConfigParser::parseBasicConfig(const cxxopts::ParseResult &result) {
+bool ConfigParser::_parseBasicConfig(const cxxopts::ParseResult &result) {
   buffer_size_ = result["buffer-size"].as<size_t>();
   running_time_ = result["running-time"].as<size_t>();
   policy_config_.hot_access_interval =
@@ -62,7 +63,7 @@ bool ConfigParser::parseBasicConfig(const cxxopts::ParseResult &result) {
   return true;
 }
 
-bool ConfigParser::parseServerConfig(const cxxopts::ParseResult &result) {
+bool ConfigParser::_parseServerConfig(const cxxopts::ParseResult &result) {
   auto mem_sizes = result["mem-sizes"].as<std::vector<size_t>>();
   if (mem_sizes.size() != server_memory_config_.num_tiers) {
     LOG_ERROR("Server configuration must have exactly "
@@ -77,9 +78,11 @@ bool ConfigParser::parseServerConfig(const cxxopts::ParseResult &result) {
   return true;
 }
 
-bool ConfigParser::parseClientConfigs(
-    const std::vector<std::string> &patterns,
-    const std::vector<std::string> &tier_sizes) {
+bool ConfigParser::_parseClientConfigs(const cxxopts::ParseResult &result) {
+  std::vector<std::string> patterns =
+      result["patterns"].as<std::vector<std::string>>();
+  std::vector<std::string> tier_sizes =
+      result["client-tier-sizes"].as<std::vector<std::string>>();
   if (patterns.size() != tier_sizes.size()) {
     LOG_ERROR("Number of patterns must match number of clients");
     return false;
@@ -87,7 +90,7 @@ bool ConfigParser::parseClientConfigs(
 
   for (size_t i = 0; i < patterns.size(); i++) {
     ClientConfig config;
-    auto sizes = split(tier_sizes[i], ' ');
+    auto sizes = _split(tier_sizes[i], ' ');
 
     if (sizes.size() != server_memory_config_.num_tiers) {
       LOG_ERROR("Invalid number of tier sizes for client " << i);
@@ -120,25 +123,20 @@ bool ConfigParser::parse(int argc, char *argv[]) {
     return false;
   }
 
-  if (!parseBasicConfig(result) || !parseServerConfig(result)) {
+  if (!_parseBasicConfig(result) || !_parseServerConfig(result) ||
+      !_parseClientConfigs(result)) {
     return false;
   }
 
-  if (!parseClientConfigs(
-          result["patterns"].as<std::vector<std::string>>(),
-          result["client-tier-sizes"].as<std::vector<std::string>>())) {
+  if (!_validateMemoryConfiguration()) {
     return false;
   }
 
-  if (!validateMemoryConfiguration()) {
-    return false;
-  }
-
-  printConfig();
+  _printConfig();
   return true;
 }
 
-std::string ConfigParser::getTierName(size_t tier_idx, size_t num_tiers) {
+std::string ConfigParser::_getTierName(size_t tier_idx, size_t num_tiers) {
   if (num_tiers == 2) {
     return (tier_idx == 0) ? "DRAM" : "PMEM";
   }
@@ -147,7 +145,7 @@ std::string ConfigParser::getTierName(size_t tier_idx, size_t num_tiers) {
                            : "PMEM";
 }
 
-bool ConfigParser::validateMemoryConfiguration() {
+bool ConfigParser::_validateMemoryConfiguration() {
   std::vector<size_t> tier_totals(server_memory_config_.num_tiers, 0);
 
   for (const auto &client : client_configs_) {
@@ -163,14 +161,15 @@ bool ConfigParser::validateMemoryConfiguration() {
   for (size_t i = 0; i < server_memory_config_.num_tiers; i++) {
     if (tier_totals[i] > *tier_limits[i]) {
       LOG_ERROR("Memory allocation exceeds "
-                << getTierName(i, server_memory_config_.num_tiers) << " limit");
+                << _getTierName(i, server_memory_config_.num_tiers)
+                << " limit");
       return false;
     }
   }
   return true;
 }
 
-void ConfigParser::printConfig() const {
+void ConfigParser::_printConfig() const {
   LOG_INFO("========== Configuration Parameters ==========");
   LOG_INFO("Buffer Size: " << buffer_size_);
   LOG_INFO("Running Time: " << running_time_ << " seconds");
@@ -188,7 +187,7 @@ void ConfigParser::printConfig() const {
     const size_t *sizes[] = {&server_memory_config_.local_numa.capacity,
                              &server_memory_config_.remote_numa.capacity,
                              &server_memory_config_.pmem.capacity};
-    LOG_INFO("  - " << getTierName(i, server_memory_config_.num_tiers) << ": "
+    LOG_INFO("  - " << _getTierName(i, server_memory_config_.num_tiers) << ": "
                     << *sizes[i] << " pages");
   }
 
@@ -200,7 +199,7 @@ void ConfigParser::printConfig() const {
                      ? "Uniform"
                      : "Skewed"));
     for (size_t j = 0; j < client_configs_[i].tier_sizes.size(); j++) {
-      LOG_INFO("    - " << getTierName(j, server_memory_config_.num_tiers)
+      LOG_INFO("    - " << _getTierName(j, server_memory_config_.num_tiers)
                         << ": " << client_configs_[i].tier_sizes[j]
                         << " pages");
     }
