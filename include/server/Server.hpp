@@ -33,6 +33,7 @@ private:
   // start function
   void _runManagerThread();
   void _runScannerThread();
+  void _runPeriodicalMetricsThread();
 
   // shutdown function
   bool _shouldShutdown();

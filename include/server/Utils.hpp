@@ -218,17 +218,22 @@ inline void migrate_page(void *addr, PageLayer current_tier,
  */
 inline uint64_t access_page(void *addr, mem_access_mode mode) {
   volatile uint64_t *page = (volatile uint64_t *)addr;
+
+  // Ensure cache is flushed first
+  flush_cache(addr);
+  _mm_mfence(); // Add memory fence to ensure flush completes
+
   uint64_t start_time = get_time_ns();
 
-  flush_cache(addr);
-  uint64_t value_1, value_2 = 44;
+  uint64_t value_1;
+  uint64_t value_2 = 44;
 
   switch (mode) {
   case READ:
-    memcpy(&value_1, (const void *)&page, sizeof(uint64_t));
+    memcpy(&value_1, (const void *)page, sizeof(uint64_t));
     break;
   case WRITE:
-    memcpy((void *)&page, &value_2, sizeof(uint64_t));
+    memcpy((void *)page, &value_2, sizeof(uint64_t));
     break;
   default:
     break;

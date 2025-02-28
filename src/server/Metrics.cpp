@@ -114,3 +114,66 @@ void Metrics::reset() {
   access_latency_ = AccumulatorType{acc::tag::extended_p_square::probabilities =
                                         probabilities};
 }
+
+void Metrics::periodicalMetrics() {
+  // Store current counter values to ensure consistency
+  uint64_t total_latency_now = total_latency_.load();
+  uint64_t local_access_count_now = local_access_count_.load();
+  uint64_t remote_access_count_now = remote_access_count_.load();
+  uint64_t pmem_access_count_now = pmem_access_count_.load();
+
+  // Calculate deltas since last period
+  uint64_t current_latency = total_latency_now - last_period_latency_;
+  uint64_t current_local_access_count =
+      local_access_count_now - last_period_local_access_count_;
+  uint64_t current_remote_access_count =
+      remote_access_count_now - last_period_remote_access_count_;
+  uint64_t current_pmem_access_count =
+      pmem_access_count_now - last_period_pmem_access_count_;
+
+  uint64_t current_access = current_local_access_count +
+                            current_remote_access_count +
+                            current_pmem_access_count;
+
+  // Calculate throughput
+  double throughput = 0.0;
+  double avg_latency = 0.0;
+  if (current_latency > 0) {
+    throughput = static_cast<double>(current_access) * 1e9 /
+                 static_cast<double>(current_latency);
+    avg_latency = static_cast<double>(current_latency) /
+                  static_cast<double>(current_access);
+  }
+
+  // Update last period values for next report
+  last_period_latency_ = total_latency_now;
+  last_period_local_access_count_ = local_access_count_now;
+  last_period_remote_access_count_ = remote_access_count_now;
+  last_period_pmem_access_count_ = pmem_access_count_now;
+
+  // Output metrics to file
+  std::ofstream out_file;
+  out_file.open("result/periodic_metrics.csv", std::ios_base::app);
+
+  if (!out_file.is_open()) {
+    // If file couldn't be opened, log error and return
+    LOG_ERROR("Failed to open periodic_metrics.csv for writing");
+    return;
+  }
+
+  // Check if file is empty (need to write header)
+  out_file.seekp(0, std::ios::end);
+  if (out_file.tellp() == 0) {
+    out_file << "Latency(ns),Throughput(ops/"
+                "s),LocalAccess,RemoteAccess,PmemAccess,TotalAccess"
+             << std::endl;
+  }
+
+  // Write metrics to file
+  out_file << avg_latency << "," << throughput << ","
+           << current_local_access_count << "," << current_remote_access_count
+           << "," << current_pmem_access_count << "," << current_access
+           << std::endl;
+
+  out_file.close();
+}

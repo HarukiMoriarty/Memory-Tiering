@@ -77,7 +77,7 @@ void Server::_runManagerThread() {
       boost::this_thread::sleep_for(boost::chrono::nanoseconds(100));
     }
   }
-  LOG_DEBUG("Manager thread exiting...");
+  LOG_INFO("Manager thread exiting...");
 }
 
 void Server::_runScannerThread() {
@@ -86,6 +86,16 @@ void Server::_runScannerThread() {
       boost::chrono::milliseconds(policy_config_.hot_access_interval),
       boost::chrono::milliseconds(policy_config_.cold_access_interval),
       server_config_.num_tiers);
+  LOG_INFO("Policy thread exiting...");
+}
+
+void Server::_runPeriodicalMetricsThread() {
+  LOG_INFO("Periodical metric thread start!");
+  Metrics &metrics = Metrics::getInstance();
+  while (!_shouldShutdown()) {
+    boost::this_thread::sleep_for(boost::chrono::seconds(10));
+    metrics.periodicalMetrics();
+  }
   LOG_DEBUG("Policy thread exiting...");
 }
 
@@ -104,10 +114,13 @@ bool Server::_shouldShutdown() {
 void Server::start() {
   boost::thread server_thread(&Server::_runManagerThread, this);
   boost::thread policy_thread(&Server::_runScannerThread, this);
+  boost::thread periodical_metric_thread(&Server::_runPeriodicalMetricsThread,
+                                         this);
 
   // Join threads
   server_thread.join();
   policy_thread.join();
+  periodical_metric_thread.join();
 
   LOG_INFO("All threads exited. Server shutdown complete.");
 }

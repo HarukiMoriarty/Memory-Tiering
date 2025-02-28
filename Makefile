@@ -1,5 +1,5 @@
 CXX = g++
-CXXFLAGS = -Wall -std=c++17 -pthread -DBOOST_LOG_DYN_LINK
+CXXFLAGS = -Wall -std=c++17 -pthread -DBOOST_LOG_DYN_LINK -O3
 INCLUDES = -Iinclude \
           -Iinclude/client \
           -Iinclude/server \

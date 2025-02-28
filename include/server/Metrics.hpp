@@ -50,6 +50,9 @@ public:
     total_latency_ += latency_ns;
   }
 
+  // Periodically latency calculation
+  void periodicalMetrics();
+
   // Print current metrics (call periodically or at program end)
   void printMetricsThreeTiers() const;
   void printMetricsTwoTiers() const;
@@ -86,6 +89,12 @@ private:
 
   // Total latency tracking for throughput calculation
   std::atomic<uint64_t> total_latency_{0};
+
+  // Periodical metrics
+  uint64_t last_period_local_access_count_{0};
+  uint64_t last_period_remote_access_count_{0};
+  uint64_t last_period_pmem_access_count_{0};
+  uint64_t last_period_latency_{0};
 };
 
 #endif
