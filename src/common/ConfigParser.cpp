@@ -39,6 +39,8 @@ ConfigParser::ConfigParser()
       cxxopts::value<double>()->default_value("1.0"))(
       "s,mem-sizes", "Memory size in pages for each tier",
       cxxopts::value<std::vector<size_t>>())(
+      "sample-rate", "Periodical sampleing rate",
+      cxxopts::value<size_t>()->default_value("10"))(
       "t,num-tiers", "Number of memory tiers",
       cxxopts::value<size_t>()->default_value("3"))("h,help",
                                                     "Print usage information");
@@ -54,6 +56,7 @@ bool ConfigParser::_parseBasicConfig(const cxxopts::ParseResult &result) {
   server_memory_config_.num_tiers = result["num-tiers"].as<size_t>();
   cdf_output_file_ = result["output"].as<std::string>();
   rw_ratio_ = result["ratio"].as<double>();
+  sample_rate_ = result["sample-rate"].as<size_t>();
 
   if (server_memory_config_.num_tiers < 2 ||
       server_memory_config_.num_tiers > 3) {
@@ -174,6 +177,7 @@ void ConfigParser::_printConfig() const {
   LOG_INFO("Buffer Size: " << buffer_size_);
   LOG_INFO("Running Time: " << running_time_ << " seconds");
   LOG_INFO("Read/Write Ratio: " << rw_ratio_);
+  LOG_INFO("Sample Rate: " << sample_rate_);
   LOG_INFO("Migration Page Policy:");
   LOG_INFO("  - Hot Access Interval: " << policy_config_.hot_access_interval
                                        << " ms");

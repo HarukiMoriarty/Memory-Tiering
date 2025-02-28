@@ -26,6 +26,7 @@ public:
   const PolicyConfig &getPolicyConfig() const { return policy_config_; }
   const std::string &getLatencyOutputFile() const { return cdf_output_file_; }
   const double &getRwRatio() const { return rw_ratio_; }
+  const size_t &getSampleRate() const { return sample_rate_; }
 
   bool isHelpRequested() const { return help_requested_; }
 
@@ -45,6 +46,7 @@ private:
   size_t buffer_size_;
   size_t running_time_;
   double rw_ratio_;
+  size_t sample_rate_;
 
   std::vector<ClientConfig> client_configs_;
   ServerMemoryConfig server_memory_config_;

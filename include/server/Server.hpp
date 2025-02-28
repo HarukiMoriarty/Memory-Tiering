@@ -21,7 +21,7 @@ public:
   Server(RingBuffer<ClientMessage> &client_buffer,
          const std::vector<ClientConfig> &client_configs,
          const ServerMemoryConfig &server_config,
-         const PolicyConfig &policy_config);
+         const PolicyConfig &policy_config, size_t sample_rate);
   ~Server();
 
   void handleClientMessage(const ClientMessage &msg);
@@ -42,6 +42,7 @@ private:
   RingBuffer<ClientMessage> &client_buffer_;
   PageTable *page_table_;
   Scanner *scanner_;
+  size_t sample_rate_;
 
   ServerMemoryConfig server_config_;
   PolicyConfig policy_config_;

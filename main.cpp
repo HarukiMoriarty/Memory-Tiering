@@ -19,8 +19,8 @@ int main(int argc, char *argv[]) {
 
   ServerMemoryConfig server_config = config.getServerMemoryConfig();
   PolicyConfig policy_config = config.getPolicyConfig();
-  Server server(client_req_buffer, client_configs, server_config,
-                policy_config);
+  Server server(client_req_buffer, client_configs, server_config, policy_config,
+                config.getSampleRate());
 
   // Sleep for hot time thershold time, make sure loaded page will not be
   // classified as hot page.

@@ -230,10 +230,16 @@ inline uint64_t access_page(void *addr, mem_access_mode mode) {
 
   switch (mode) {
   case READ:
-    memcpy(&value_1, (const void *)page, sizeof(uint64_t));
+    asm volatile("movq (%1), %0" : "=r"(value_1) : "r"(page) : "memory");
     break;
   case WRITE:
-    memcpy((void *)page, &value_2, sizeof(uint64_t));
+    asm volatile("movq %1, (%0)\n\t" // Store value to memory
+                 "mfence\n\t"        // Memory fence to order operations
+                 "clflush (%0)\n\t"  // Flush the cache line
+                 "mfence"            // Ensure flush completes
+                 :
+                 : "r"(page), "r"(value_2)
+                 : "memory");
     break;
   default:
     break;
