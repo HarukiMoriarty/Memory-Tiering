@@ -2,19 +2,19 @@
 
 Server::Server(RingBuffer<ClientMessage> &client_buffer,
                const std::vector<ClientConfig> &client_configs,
-               const ServerMemoryConfig &server_config,
+               ServerMemoryConfig *server_config,
                const PolicyConfig &policy_config, size_t sample_rate)
     : client_buffer_(client_buffer), sample_rate_(sample_rate),
       server_config_(server_config), policy_config_(policy_config) {
   // Calculate load memory pages
   size_t client_total_page = 0;
-  if (server_config_.num_tiers == 2) {
+  if (server_config_->num_tiers == 2) {
     for (ClientConfig client : client_configs) {
       base_page_id_.push_back(client_total_page);
       client_total_page += client.tier_sizes[0];
       client_total_page += client.tier_sizes[1];
     }
-  } else if (server_config_.num_tiers == 3) {
+  } else if (server_config_->num_tiers == 3) {
     for (ClientConfig client : client_configs) {
       base_page_id_.push_back(client_total_page);
       client_total_page += client.tier_sizes[0];
@@ -26,7 +26,7 @@ Server::Server(RingBuffer<ClientMessage> &client_buffer,
   page_table_ = new PageTable(client_configs, server_config);
   page_table_->initPageTable();
 
-  scanner_ = new Scanner(*page_table_);
+  scanner_ = new Scanner(page_table_);
 
   client_done_flags_ = std::vector<bool>(client_configs.size(), false);
 }
@@ -52,11 +52,7 @@ void Server::handleClientMessage(const ClientMessage &msg) {
   }
 
   size_t page_index = base_page_id_[msg.client_id] + msg.pid;
-  if (msg.op_type == OperationType::READ) {
-    page_table_->accessPage(page_index, READ);
-  } else {
-    page_table_->accessPage(page_index, WRITE);
-  }
+  page_table_->accessPage(page_index, msg.op_type);
 }
 
 void Server::_runManagerThread() {
@@ -82,10 +78,9 @@ void Server::_runManagerThread() {
 
 void Server::_runScannerThread() {
   LOG_INFO("Scanner thread start!");
-  scanner_->runScanner(
-      boost::chrono::milliseconds(policy_config_.hot_access_interval),
-      boost::chrono::milliseconds(policy_config_.cold_access_interval),
-      server_config_.num_tiers);
+  scanner_->runScanner(policy_config_.hot_access_interval,
+                       policy_config_.cold_access_interval,
+                       server_config_->num_tiers);
   LOG_INFO("Policy thread exiting...");
 }
 
@@ -94,7 +89,7 @@ void Server::_runPeriodicalMetricsThread() {
   Metrics &metrics = Metrics::getInstance();
   while (!_shouldShutdown()) {
     boost::this_thread::sleep_for(boost::chrono::seconds(sample_rate_));
-    metrics.periodicalMetrics();
+    metrics.periodicalMetrics(server_config_);
   }
   LOG_DEBUG("Policy thread exiting...");
 }

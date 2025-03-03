@@ -115,7 +115,7 @@ void Metrics::reset() {
                                         probabilities};
 }
 
-void Metrics::periodicalMetrics() {
+void Metrics::periodicalMetrics(ServerMemoryConfig *server_config) {
   // Store current counter values to ensure consistency
   uint64_t total_latency_now = total_latency_.load();
   uint64_t local_access_count_now = local_access_count_.load();
@@ -165,15 +165,18 @@ void Metrics::periodicalMetrics() {
   out_file.seekp(0, std::ios::end);
   if (out_file.tellp() == 0) {
     out_file << "Latency(ns),Throughput(ops/"
-                "s),LocalAccess,RemoteAccess,PmemAccess,TotalAccess"
+                "s),LocalAccess,RemoteAccess,PmemAccess,TotalAccess,"
+                "LocalCount,RemoteCount,PmemCount"
              << std::endl;
   }
 
   // Write metrics to file
   out_file << avg_latency << "," << throughput << ","
            << current_local_access_count << "," << current_remote_access_count
-           << "," << current_pmem_access_count << "," << current_access
-           << std::endl;
+           << "," << current_pmem_access_count << "," << current_access << ","
+           << server_config->local_numa.count << ","
+           << server_config->remote_numa.count << ","
+           << server_config->pmem.count << std::endl;
 
   out_file.close();
 }

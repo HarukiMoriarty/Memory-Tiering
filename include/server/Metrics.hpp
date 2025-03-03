@@ -11,6 +11,7 @@
 #include <cstdint>
 #include <fstream>
 
+#include "Common.hpp"
 #include "Logger.hpp"
 
 namespace acc = boost::accumulators;
@@ -51,7 +52,7 @@ public:
   }
 
   // Periodically latency calculation
-  void periodicalMetrics();
+  void periodicalMetrics(ServerMemoryConfig *server_config);
 
   // Print current metrics (call periodically or at program end)
   void printMetricsThreeTiers() const;

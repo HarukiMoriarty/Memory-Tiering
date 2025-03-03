@@ -14,6 +14,8 @@
 #include <time.h>
 #include <unistd.h>
 
+#include "Common.hpp"
+
 //======================================
 // Constants and Configurations
 //======================================
@@ -21,19 +23,6 @@
 #ifndef PAGE_SIZE
 #define PAGE_SIZE 4096 // Default system page size
 #endif
-
-#define PAGE_NUM 100000     // Number of pages to allocate
-#define ITERATIONS 1        // Number of test iterations
-#define OFFSET_COUNT 100000 // Number of random offsets for testing
-
-/**
- * Memory access modes for benchmarking
- */
-typedef enum {
-  READ = 0,       // Read-only operations
-  WRITE = 1,      // Write-only operations
-  READ_WRITE = 2, // Combined read-write operations
-} mem_access_mode;
 
 //======================================
 // Utility Functions
@@ -54,24 +43,6 @@ inline uint64_t get_time_ns() {
  * @param addr Address to flush from cache
  */
 inline void flush_cache(void *addr) { _mm_clflush(addr); }
-
-/**
- * Initialize random offset array for memory access patterns
- * @return Array of random page offsets
- */
-inline int *init_offsets() {
-  int *offsets = (int *)malloc(OFFSET_COUNT * sizeof(int));
-  if (!offsets) {
-    perror("Memory allocation failed");
-    exit(EXIT_FAILURE);
-  }
-
-  for (size_t i = 0; i < OFFSET_COUNT; i++) {
-    offsets[i] = (rand() % PAGE_NUM) * PAGE_SIZE / sizeof(uint64_t);
-  }
-
-  return offsets;
-}
 
 //======================================
 // Memory Allocation
@@ -216,7 +187,7 @@ inline void migrate_page(void *addr, PageLayer current_tier,
  * @param mode Memory access mode (read/write)
  * @return Access time in nanoseconds
  */
-inline uint64_t access_page(void *addr, mem_access_mode mode) {
+inline uint64_t access_page(void *addr, OperationType mode) {
   volatile uint64_t *page = (volatile uint64_t *)addr;
 
   // Ensure cache is flushed first
@@ -229,10 +200,10 @@ inline uint64_t access_page(void *addr, mem_access_mode mode) {
   uint64_t value_2 = 44;
 
   switch (mode) {
-  case READ:
+  case OperationType::READ:
     asm volatile("movq (%1), %0" : "=r"(value_1) : "r"(page) : "memory");
     break;
-  case WRITE:
+  case OperationType::WRITE:
     asm volatile("movq %1, (%0)\n\t" // Store value to memory
                  "mfence\n\t"        // Memory fence to order operations
                  "clflush (%0)\n\t"  // Flush the cache line
@@ -243,38 +214,6 @@ inline uint64_t access_page(void *addr, mem_access_mode mode) {
     break;
   default:
     break;
-  }
-
-  return (get_time_ns() - start_time);
-}
-
-/**
- * Access random memory pages and measure time
- * @param addr Base address
- * @param offsets Array of random offsets
- * @param mode Memory access mode
- * @return Total access time in nanoseconds
- */
-inline uint64_t access_random_page(void *addr, int *offsets,
-                                   mem_access_mode mode) {
-  volatile uint64_t *page = (volatile uint64_t *)addr;
-  uint64_t start_time = get_time_ns();
-
-  for (size_t i = 0; i < OFFSET_COUNT; i++) {
-    flush_cache(addr);
-    int offset = offsets[i];
-    uint64_t value_1, value_2 = 44;
-
-    switch (mode) {
-    case READ:
-      memcpy(&value_1, (const void *)&page[offset], sizeof(uint64_t));
-      break;
-    case WRITE:
-      memcpy((void *)&page[offset], &value_2, sizeof(uint64_t));
-      break;
-    default:
-      break;
-    }
   }
 
   return (get_time_ns() - start_time);

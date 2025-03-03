@@ -1,14 +1,14 @@
 #include "PageTable.hpp"
 
 PageTable::PageTable(const std::vector<ClientConfig> &client_configs,
-                     ServerMemoryConfig server_config)
+                     ServerMemoryConfig *server_config)
     : client_configs_(client_configs), server_config_(server_config) {
-  if (server_config_.num_tiers == 2) {
+  if (server_config_->num_tiers == 2) {
     for (ClientConfig client : client_configs) {
       local_page_load_ += client.tier_sizes[0];
       pmem_page_load_ += client.tier_sizes[1];
     }
-  } else if (server_config_.num_tiers == 3) {
+  } else if (server_config_->num_tiers == 3) {
     for (ClientConfig client : client_configs) {
       local_page_load_ += client.tier_sizes[0];
       remote_page_load_ += client.tier_sizes[1];
@@ -58,40 +58,40 @@ void PageTable::initPageTable() {
   };
 
   for (ClientConfig client : client_configs_) {
-    if (server_config_.num_tiers == 2) {
+    if (server_config_->num_tiers == 2) {
       fillPages(PageLayer::NUMA_LOCAL, client.tier_sizes[0], local_base_,
                 local_offset_pages);
-      server_config_.local_numa.count += client.tier_sizes[0];
+      server_config_->local_numa.count += client.tier_sizes[0];
       fillPages(PageLayer::PMEM, client.tier_sizes[1], pmem_base_,
                 pmem_offset_pages);
-      server_config_.pmem.count += client.tier_sizes[1];
-    } else if (server_config_.num_tiers == 3) {
+      server_config_->pmem.count += client.tier_sizes[1];
+    } else if (server_config_->num_tiers == 3) {
       fillPages(PageLayer::NUMA_LOCAL, client.tier_sizes[0], local_base_,
                 local_offset_pages);
-      server_config_.local_numa.count += client.tier_sizes[0];
+      server_config_->local_numa.count += client.tier_sizes[0];
       fillPages(PageLayer::NUMA_REMOTE, client.tier_sizes[1], remote_base_,
                 remote_offset_pages);
-      server_config_.remote_numa.count += client.tier_sizes[1];
+      server_config_->remote_numa.count += client.tier_sizes[1];
       fillPages(PageLayer::PMEM, client.tier_sizes[2], pmem_base_,
                 pmem_offset_pages);
-      server_config_.pmem.count += client.tier_sizes[2];
+      server_config_->pmem.count += client.tier_sizes[2];
     }
   }
 
   LOG_INFO("Page Table Initialization Done.");
 }
 
-PageMetadata PageTable::getPage(size_t page_id) {
+std::tuple<PageLayer, uint64_t> PageTable::getPageMetaData(size_t page_id) {
   auto it = table_.find(page_id);
   if (it == table_.end()) {
     LOG_ERROR("Get Page metadata index " << page_id << " not found");
-    return PageMetadata();
+    return std::make_tuple(PageLayer::NUMA_LOCAL, 0);
   }
   // This has an possible race condition:
   // After scanning the metadata, this page is accessed. This might caused
-  // False cold page.
-  boost::shared_lock<boost::shared_mutex> lock(it->second.mutex);
-  return it->second.metadata;
+  // False cold page. For efficiency, we removed the lock here
+  return std::make_tuple(it->second.metadata.page_layer.load(),
+                         it->second.metadata.last_access_time_ms.load());
 }
 
 size_t PageTable::scanNext() {
@@ -103,7 +103,7 @@ size_t PageTable::scanNext() {
   return current;
 }
 
-void PageTable::accessPage(size_t page_id, mem_access_mode mode) {
+void PageTable::accessPage(size_t page_id, OperationType mode) {
   auto it = table_.find(page_id);
   if (it == table_.end()) {
     LOG_ERROR("Update Page access index " << page_id << " not found");
@@ -111,10 +111,14 @@ void PageTable::accessPage(size_t page_id, mem_access_mode mode) {
   }
 
   boost::unique_lock<boost::shared_mutex> unique_lock(it->second.mutex);
-  PageMetadata &page_meta_data = it->second.metadata;
-  uint64_t access_time = access_page(page_meta_data.page_address, mode);
-  page_meta_data.last_access_time = boost::chrono::steady_clock::now();
+  uint64_t access_time = access_page(it->second.page_address, mode);
   unique_lock.unlock();
+  PageMetadata &page_meta_data = it->second.metadata;
+  auto now = boost::chrono::steady_clock::now();
+  auto duration = now.time_since_epoch();
+  auto ms = boost::chrono::duration_cast<boost::chrono::milliseconds>(duration)
+                .count();
+  page_meta_data.last_access_time_ms.store(ms);
 
   Metrics::getInstance().recordAccessLatency(access_time);
   switch (page_meta_data.page_layer) {
@@ -138,7 +142,6 @@ void PageTable::migratePage(size_t page_index, PageLayer page_target_layer) {
     return;
   }
 
-  boost::unique_lock<boost::shared_mutex> unique_lock(it->second.mutex);
   PageMetadata &page_meta_data = it->second.metadata;
   PageLayer page_current_layer = page_meta_data.page_layer;
 
@@ -149,24 +152,24 @@ void PageTable::migratePage(size_t page_index, PageLayer page_target_layer) {
   // Get layer info pointers
   switch (page_target_layer) {
   case PageLayer::NUMA_LOCAL:
-    target_layer_info = &server_config_.local_numa;
+    target_layer_info = &server_config_->local_numa;
     break;
   case PageLayer::NUMA_REMOTE:
-    target_layer_info = &server_config_.remote_numa;
+    target_layer_info = &server_config_->remote_numa;
     break;
   case PageLayer::PMEM:
-    target_layer_info = &server_config_.pmem;
+    target_layer_info = &server_config_->pmem;
     break;
   }
   switch (page_current_layer) {
   case PageLayer::NUMA_LOCAL:
-    current_layer_info = &server_config_.local_numa;
+    current_layer_info = &server_config_->local_numa;
     break;
   case PageLayer::NUMA_REMOTE:
-    current_layer_info = &server_config_.remote_numa;
+    current_layer_info = &server_config_->remote_numa;
     break;
   case PageLayer::PMEM:
-    current_layer_info = &server_config_.pmem;
+    current_layer_info = &server_config_->pmem;
     break;
   }
 
@@ -180,14 +183,17 @@ void PageTable::migratePage(size_t page_index, PageLayer page_target_layer) {
   // Perform the page migration
   LOG_DEBUG("Moving Page " << page_index << " from Node " << page_current_layer
                            << " to Node " << page_target_layer << "...");
-  migrate_page(page_meta_data.page_address, page_current_layer,
-               page_target_layer);
+  boost::unique_lock<boost::shared_mutex> unique_lock(it->second.mutex);
+  migrate_page(it->second.page_address, page_current_layer, page_target_layer);
+  unique_lock.unlock();
   // Maintain metadata
   page_meta_data.page_layer = page_target_layer;
-  page_meta_data.last_access_time = boost::chrono::steady_clock::now();
+  auto now = boost::chrono::steady_clock::now();
+  auto duration = now.time_since_epoch();
+  auto ms = boost::chrono::duration_cast<boost::chrono::milliseconds>(duration)
+                .count();
+  page_meta_data.last_access_time_ms.store(ms);
   LOG_DEBUG("Page " << page_index << " now on Layer " << page_target_layer);
-
-  unique_lock.unlock();
 
   // Update counters, for now scanner run in single thread, we do not need
   // Protect layer info count.
@@ -216,7 +222,7 @@ void PageTable::migratePage(size_t page_index, PageLayer page_target_layer) {
 
 void PageTable::_allocateMemory() {
   LOG_INFO("Allocating pages...");
-  if (server_config_.num_tiers == 2) {
+  if (server_config_->num_tiers == 2) {
     // For 2 tiers, combine local and remote NUMA memory into DRAM
     // Allocate local NUMA memory
     local_base_ =
@@ -237,15 +243,15 @@ void PageTable::_generateRandomContent() {
   // Seed the random number generator
   srand(static_cast<unsigned>(time(NULL)));
 
-  size_t local_size = (server_config_.num_tiers == 2)
+  size_t local_size = (server_config_->num_tiers == 2)
                           ? (local_page_load_ + remote_page_load_) * PAGE_SIZE
                           : local_page_load_ * PAGE_SIZE;
   size_t remote_size =
-      (server_config_.num_tiers == 3) ? remote_page_load_ * PAGE_SIZE : 0;
+      (server_config_->num_tiers == 3) ? remote_page_load_ * PAGE_SIZE : 0;
   size_t pmem_size = pmem_page_load_ * PAGE_SIZE;
 
   LOG_DEBUG("Local size: " << local_size);
-  if (server_config_.num_tiers == 3) {
+  if (server_config_->num_tiers == 3) {
     LOG_DEBUG("Remote size: " << remote_size);
   }
   LOG_DEBUG("PMEM size: " << pmem_size);
@@ -260,7 +266,7 @@ void PageTable::_generateRandomContent() {
   LOG_DEBUG("Random content generated for local numa node.");
 
   // Fill numa remote tier
-  if (server_config_.num_tiers == 3) {
+  if (server_config_->num_tiers == 3) {
     unsigned char *base = static_cast<unsigned char *>(remote_base_);
     for (size_t i = 0; i < remote_size; i++) {
       base[i] = static_cast<unsigned char>(rand() % 256);
