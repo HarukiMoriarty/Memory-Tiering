@@ -149,29 +149,15 @@ uint64_t access_memory(void* addr, int* offsets, int offset_count, MemAccessMode
         else if (mode == WRITE) {
             uint64_t value = 0xDEADBEEF;
             asm volatile(
-                "movq %1, (%0)\n\t"     // Store value to memory
-                "mfence\n\t"            // Memory fence to order operations
-                "clflush (%0)\n\t"      // Flush the cache line
-                "mfence"                // Ensure flush completes
+                "movnti %1, (%0)\n\t"           
                 :
                 : "r" (access_addr), "r" (value)
                 : "memory"
             );
         }
-        else if (mode == READ_WRITE) {
-            // Read then write
-            uint64_t value;
-            asm volatile(
-                "movq (%1), %0\n\t"     // Read from memory
-                "movq %2, (%1)\n\t"     // Write to memory
-                "mfence\n\t"            // Memory fence
-                "clflush (%1)\n\t"      // Flush cache line
-                "mfence"                // Ensure flush completes
-                : "=r" (value)
-                : "r" (access_addr), "r" ((uint64_t)0xDEADBEEF)
-                : "memory"
-            );
-        }
+        
+        _mm_lfence(); // Prevent instruction reordering
+        _mm_mfence(); // Ensure flush completes before measurement
         
         uint64_t end = get_time_ns();
         total_time += (end - start);
