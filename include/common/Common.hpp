@@ -19,8 +19,9 @@ enum class OperationType {
  * Defines different memory access patterns for simulation
  */
 enum class AccessPattern {
-  UNIFORM,        // Uniform random access across all memory
-  SKEWED_70_20_10 // 70% access to 10% memory, 20% to next 20%, 10% to rest
+  UNIFORM, // Uniform random access across all memory
+  HOT,     // Access concentrated (20%) on randomly distributed
+  ZIPFIAN, // Access follows Zipf's law distribution
 };
 
 /**

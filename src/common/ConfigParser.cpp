@@ -33,7 +33,8 @@ ConfigParser::ConfigParser()
       cxxopts::value<size_t>())(
       "o,output", "Output file for access latency CDF data",
       cxxopts::value<std::string>()->default_value("result/latency.csv"))(
-      "p,patterns", "Memory access patterns for each client (uniform/skewed)",
+      "p,patterns",
+      "Memory access patterns for each client (uniform/hot/zipfian)",
       cxxopts::value<std::vector<std::string>>())(
       "r,ratio", "Memory access read/write ratio",
       cxxopts::value<double>()->default_value("1.0"))(
@@ -106,8 +107,10 @@ bool ConfigParser::_parseClientConfigs(const cxxopts::ParseResult &result) {
 
     if (patterns[i] == "uniform") {
       config.pattern = AccessPattern::UNIFORM;
-    } else if (patterns[i] == "skewed") {
-      config.pattern = AccessPattern::SKEWED_70_20_10;
+    } else if (patterns[i] == "hot") {
+      config.pattern = AccessPattern::HOT;
+    } else if (patterns[i] == "zipfian") {
+      config.pattern = AccessPattern::ZIPFIAN;
     } else {
       LOG_ERROR("Invalid pattern type: " << patterns[i]);
       return false;
