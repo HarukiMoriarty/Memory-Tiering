@@ -21,8 +21,9 @@ int main(int argc, char *argv[]) {
 
   // Create and initialize server
   ServerMemoryConfig serverConfig = config.getServerMemoryConfig();
+  PolicyConfig policyConfig = config.getPolicyConfig();
   Server server(clientRequestBuffer, clientConfigs, &serverConfig,
-                config.getPolicyConfig(), config.getSampleRate());
+                &policyConfig, config.getSampleRate());
 
   // NOTICE: wait for hot page threshold to expire
   boost::this_thread::sleep_for(boost::chrono::milliseconds(

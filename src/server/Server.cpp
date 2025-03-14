@@ -2,8 +2,8 @@
 
 Server::Server(RingBuffer<ClientMessage> &client_buffer,
                const std::vector<ClientConfig> &client_configs,
-               ServerMemoryConfig *server_config,
-               const PolicyConfig &policy_config, size_t sample_rate)
+               ServerMemoryConfig *server_config, PolicyConfig *policy_config,
+               size_t sample_rate)
     : client_buffer_(client_buffer), sample_rate_(sample_rate),
       server_config_(server_config), policy_config_(policy_config) {
   // Calculate load memory pages
@@ -26,7 +26,7 @@ Server::Server(RingBuffer<ClientMessage> &client_buffer,
   page_table_ = new PageTable(client_configs, server_config);
   page_table_->initPageTable();
 
-  scanner_ = new Scanner(page_table_);
+  scanner_ = new Scanner(page_table_, policy_config);
 
   client_done_flags_ = std::vector<bool>(client_configs.size(), false);
 }
@@ -78,9 +78,7 @@ void Server::_runManagerThread() {
 
 void Server::_runScannerThread() {
   LOG_INFO("Scanner thread start!");
-  scanner_->runScanner(policy_config_.hot_access_interval,
-                       policy_config_.cold_access_interval,
-                       server_config_->num_tiers);
+  scanner_->runScanner(server_config_->num_tiers);
   LOG_INFO("Policy thread exiting...");
 }
 

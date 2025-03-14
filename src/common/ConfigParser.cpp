@@ -42,6 +42,8 @@ ConfigParser::ConfigParser()
       cxxopts::value<std::vector<size_t>>())(
       "sample-rate", "Periodical sampleing rate",
       cxxopts::value<size_t>()->default_value("10"))(
+      "scan-interval", "scan interval (s)",
+      cxxopts::value<size_t>()->default_value("30"))(
       "t,num-tiers", "Number of memory tiers",
       cxxopts::value<size_t>()->default_value("3"))("h,help",
                                                     "Print usage information");
@@ -54,6 +56,7 @@ bool ConfigParser::_parseBasicConfig(const cxxopts::ParseResult &result) {
       result["hot-access-interval"].as<size_t>();
   policy_config_.cold_access_interval =
       result["cold-access-interval"].as<size_t>();
+  policy_config_.scan_interval = result["scan-interval"].as<size_t>();
   server_memory_config_.num_tiers = result["num-tiers"].as<size_t>();
   cdf_output_file_ = result["output"].as<std::string>();
   rw_ratio_ = result["ratio"].as<double>();

@@ -1,34 +1,32 @@
 #include "Scanner.hpp"
 
-Scanner::Scanner(PageTable *page_table) : page_table_(page_table) {}
+Scanner::Scanner(PageTable *page_table, PolicyConfig *policy_config)
+    : page_table_(page_table), policy_config_(policy_config) {}
 
 // Check if a page is hot based on time threshold
-bool Scanner::classifyHotPage(const uint64_t last_access_time,
-                              const uint64_t time_threshold) const {
+bool Scanner::classifyHotPage(const uint64_t last_access_time) const {
   auto current_time = boost::chrono::steady_clock::now();
   auto current_time_ms =
       boost::chrono::duration_cast<boost::chrono::milliseconds>(
           current_time.time_since_epoch())
           .count();
   auto time_since_last_access = current_time_ms - last_access_time;
-  return time_since_last_access <= time_threshold;
+  return time_since_last_access <= policy_config_->hot_access_interval;
 }
 
 // Check if a page is cold based on both access count and time threshold
-bool Scanner::classifyColdPage(const uint64_t last_access_time,
-                               const uint64_t time_threshold) const {
+bool Scanner::classifyColdPage(const uint64_t last_access_time) const {
   auto current_time = boost::chrono::steady_clock::now();
   auto current_time_ms =
       boost::chrono::duration_cast<boost::chrono::milliseconds>(
           current_time.time_since_epoch())
           .count();
   auto time_since_last_access = current_time_ms - last_access_time;
-  return time_since_last_access >= time_threshold;
+  return time_since_last_access >= policy_config_->cold_access_interval;
 }
 
 // Continuously classify pages
-void Scanner::runScanner(const uint64_t hot_time_threshold,
-                         const uint64_t cold_time_threshold, size_t num_tiers) {
+void Scanner::runScanner(size_t num_tiers) {
   auto scan_start_time = boost::chrono::steady_clock::now();
   while (!_shouldShutdown()) {
     // We are safe to use shared lock to get meta data here,
@@ -41,7 +39,7 @@ void Scanner::runScanner(const uint64_t hot_time_threshold,
 
     switch (page_layer) {
     case PageLayer::NUMA_LOCAL: {
-      if (classifyColdPage(last_access_time, cold_time_threshold)) {
+      if (classifyColdPage(last_access_time)) {
         LOG_DEBUG("Cold page detected in DRAM: " << page_id);
         if (num_tiers == 2) {
           page_table_->migratePage(page_id, PageLayer::PMEM);
@@ -54,10 +52,10 @@ void Scanner::runScanner(const uint64_t hot_time_threshold,
 
     case PageLayer::NUMA_REMOTE: {
       // Check cold first, then hot if not cold
-      if (classifyColdPage(last_access_time, cold_time_threshold)) {
+      if (classifyColdPage(last_access_time)) {
         LOG_DEBUG("Cold page detected in NUMA_REMOTE: " << page_id);
         page_table_->migratePage(page_id, PageLayer::PMEM);
-      } else if (classifyHotPage(last_access_time, hot_time_threshold)) {
+      } else if (classifyHotPage(last_access_time)) {
         LOG_DEBUG("Hot page detected in NUMA_REMOTE: " << page_id);
         page_table_->migratePage(page_id, PageLayer::NUMA_LOCAL);
       }
@@ -65,7 +63,7 @@ void Scanner::runScanner(const uint64_t hot_time_threshold,
     }
 
     case PageLayer::PMEM: {
-      if (classifyHotPage(last_access_time, hot_time_threshold)) {
+      if (classifyHotPage(last_access_time)) {
         LOG_DEBUG("Hot page detected in PMEM: " << page_id);
         if (num_tiers == 2) {
           page_table_->migratePage(page_id, PageLayer::NUMA_LOCAL);
@@ -85,7 +83,8 @@ void Scanner::runScanner(const uint64_t hot_time_threshold,
                                .count();
       LOG_INFO("finished scanning all pages in one round at " << scan_duration
                                                               << " seconds");
-      boost::this_thread::sleep_for(boost::chrono::milliseconds(10000));
+      boost::this_thread::sleep_for(
+          boost::chrono::seconds(policy_config_->scan_interval));
     }
   }
 }

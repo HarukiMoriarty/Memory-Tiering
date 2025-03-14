@@ -84,6 +84,7 @@ struct ServerMemoryConfig {
 struct PolicyConfig {
   size_t hot_access_interval;
   size_t cold_access_interval;
+  size_t scan_interval;
 };
 
 /**

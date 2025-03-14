@@ -20,7 +20,7 @@ class Server {
 public:
   Server(RingBuffer<ClientMessage> &client_buffer,
          const std::vector<ClientConfig> &client_configs,
-         ServerMemoryConfig *server_config, const PolicyConfig &policy_config,
+         ServerMemoryConfig *server_config, PolicyConfig *policy_config,
          size_t sample_rate);
   ~Server();
 
@@ -45,7 +45,7 @@ private:
   size_t sample_rate_;
 
   ServerMemoryConfig *server_config_;
-  PolicyConfig policy_config_;
+  PolicyConfig *policy_config_;
   std::vector<bool> client_done_flags_;
 
   // Base page id for each memory layer

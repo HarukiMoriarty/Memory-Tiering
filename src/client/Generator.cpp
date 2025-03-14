@@ -37,6 +37,7 @@ MemoryAccessGenerator::MemoryAccessGenerator(AccessPattern pattern,
     for (size_t i = 0; i < memory_space_size_; i++) {
       zipf_prob_[i] /= sum;
     }
+    std::shuffle(zipf_prob_.begin(), zipf_prob_.end(), rng_);
 
     zipf_dist_ = std::discrete_distribution<size_t>(zipf_prob_.begin(),
                                                     zipf_prob_.end());

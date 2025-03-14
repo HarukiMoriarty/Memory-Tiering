@@ -16,6 +16,7 @@ class Server;
 class Scanner {
 private:
   PageTable *page_table_;
+  PolicyConfig *policy_config_;
 
   bool scanner_shutdown_flag_ = false;
   boost::mutex scanner_shutdown_mutex_;
@@ -24,19 +25,16 @@ private:
 
 public:
   // Constructor
-  Scanner(PageTable *page_table);
+  Scanner(PageTable *page_table, PolicyConfig *policy_config);
 
   // Check if a single page is hot
-  bool classifyHotPage(const uint64_t last_access_time,
-                       const uint64_t time_threshold) const;
+  bool classifyHotPage(const uint64_t last_access_time) const;
 
   // Check if a single page is cold
-  bool classifyColdPage(const uint64_t last_access_time,
-                        const uint64_t time_threshold) const;
+  bool classifyColdPage(const uint64_t last_access_time) const;
 
   // Continuously classify pages
-  void runScanner(const uint64_t hot_time_threshold,
-                  const uint64_t cold_time_threshold, size_t num_tiers);
+  void runScanner(size_t num_tiers);
 
   // Stop scanner
   void signalShutdown();
