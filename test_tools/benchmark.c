@@ -13,16 +13,26 @@
 #include <cpuid.h>      
 #include <sys/ioctl.h>
 #include <asm/unistd.h>
+#include <errno.h>
 
+// System default page size
 #define PAGE_SIZE 4096
+
 // Problem: numa local only has 1GB space left
-#define PAGE_NUM 350000
+#define PAGE_NUM 300000
 #define ITERATIONS 1
-#define OFFSET_COUNT 350000
+#define OFFSET_COUNT 300000
+
+// Huge page size (2MB settings for now)
+#define HUGE_PAGE_SIZE (2 * 1024 * 1024)
 
 // CPU instruction support flags
 static int has_clflushopt = 0;
 static int has_clwb = 0;
+
+#ifndef MADV_HUGEPAGE
+#define MADV_HUGEPAGE 14
+#endif
 
 typedef enum {
     READ = 0,
@@ -36,8 +46,12 @@ typedef enum {
 typedef struct {
     int fd_dtlb_load_misses;
     int fd_dtlb_store_misses;
+    int fd_all_loads;
+    int fd_all_stores;
     uint64_t dtlb_load_misses;
     uint64_t dtlb_store_misses;
+    uint64_t all_loads;
+    uint64_t all_stores;
 } TLBCounters;
 
 static inline void asm_read(volatile void* addr, uint64_t* value) {
@@ -111,43 +125,72 @@ TLBCounters* setup_tlb_counters() {
 
     struct perf_event_attr pe;
 
-    // Set up DTLB load miss counter
+    // Set up STLB load miss counter
     memset(&pe, 0, sizeof(struct perf_event_attr));
-    pe.type = PERF_TYPE_HW_CACHE;
+    pe.type = PERF_TYPE_RAW;
     pe.size = sizeof(struct perf_event_attr);
-    // Read TLB statistic
-    pe.config = (PERF_COUNT_HW_CACHE_DTLB) |
-        (PERF_COUNT_HW_CACHE_OP_READ << 8) |
-        (PERF_COUNT_HW_CACHE_RESULT_MISS << 16);
+    pe.config = 0x11d0;  // Raw event code for mem_inst_retired.stlb_miss_loads
     pe.disabled = 1;
-    // Exclusive kernel event
     pe.exclude_kernel = 1;
-    // Exclusive hypervisor event
     pe.exclude_hv = 1;
 
     counters->fd_dtlb_load_misses = syscall(__NR_perf_event_open, &pe, 0, -1, -1, 0);
     if (counters->fd_dtlb_load_misses == -1) {
-        perror("Error opening DTLB load miss counter");
+        perror("Error opening STLB load miss counter");
         free(counters);
         return NULL;
     }
 
-    // Set up DTLB store miss counter
+    // Set up STLB store miss counter
     memset(&pe, 0, sizeof(struct perf_event_attr));
-    pe.type = PERF_TYPE_HW_CACHE;
+    pe.type = PERF_TYPE_RAW;
     pe.size = sizeof(struct perf_event_attr);
-    // Write TLB statistic
-    pe.config = (PERF_COUNT_HW_CACHE_DTLB) |
-        (PERF_COUNT_HW_CACHE_OP_WRITE << 8) |
-        (PERF_COUNT_HW_CACHE_RESULT_MISS << 16);
+    pe.config = 0x12d0;  // Raw event code for mem_inst_retired.stlb_miss_stores
     pe.disabled = 1;
     pe.exclude_kernel = 1;
     pe.exclude_hv = 1;
 
     counters->fd_dtlb_store_misses = syscall(__NR_perf_event_open, &pe, 0, -1, -1, 0);
     if (counters->fd_dtlb_store_misses == -1) {
-        perror("Error opening DTLB store miss counter");
+        perror("Error opening STLB store miss counter");
         close(counters->fd_dtlb_load_misses);
+        free(counters);
+        return NULL;
+    }
+
+    // Set up counter for all retired load instructions
+    memset(&pe, 0, sizeof(struct perf_event_attr));
+    pe.type = PERF_TYPE_RAW;
+    pe.size = sizeof(struct perf_event_attr);
+    pe.config = 0x81d0;  // Raw event code for mem_inst_retired.all_loads
+    pe.disabled = 1;
+    pe.exclude_kernel = 1;
+    pe.exclude_hv = 1;
+
+    counters->fd_all_loads = syscall(__NR_perf_event_open, &pe, 0, -1, -1, 0);
+    if (counters->fd_all_loads == -1) {
+        perror("Error opening all loads counter");
+        close(counters->fd_dtlb_load_misses);
+        close(counters->fd_dtlb_store_misses);
+        free(counters);
+        return NULL;
+    }
+
+    // Set up counter for all retired store instructions
+    memset(&pe, 0, sizeof(struct perf_event_attr));
+    pe.type = PERF_TYPE_RAW;
+    pe.size = sizeof(struct perf_event_attr);
+    pe.config = 0x82d0;  // Raw event code for mem_inst_retired.all_stores
+    pe.disabled = 1;
+    pe.exclude_kernel = 1;
+    pe.exclude_hv = 1;
+
+    counters->fd_all_stores = syscall(__NR_perf_event_open, &pe, 0, -1, -1, 0);
+    if (counters->fd_all_stores == -1) {
+        perror("Error opening all stores counter");
+        close(counters->fd_dtlb_load_misses);
+        close(counters->fd_dtlb_store_misses);
+        close(counters->fd_all_loads);
         free(counters);
         return NULL;
     }
@@ -160,8 +203,13 @@ void start_tlb_counting(TLBCounters* counters) {
 
     ioctl(counters->fd_dtlb_load_misses, PERF_EVENT_IOC_RESET, 0);
     ioctl(counters->fd_dtlb_store_misses, PERF_EVENT_IOC_RESET, 0);
+    ioctl(counters->fd_all_loads, PERF_EVENT_IOC_RESET, 0);
+    ioctl(counters->fd_all_stores, PERF_EVENT_IOC_RESET, 0);
+    
     ioctl(counters->fd_dtlb_load_misses, PERF_EVENT_IOC_ENABLE, 0);
     ioctl(counters->fd_dtlb_store_misses, PERF_EVENT_IOC_ENABLE, 0);
+    ioctl(counters->fd_all_loads, PERF_EVENT_IOC_ENABLE, 0);
+    ioctl(counters->fd_all_stores, PERF_EVENT_IOC_ENABLE, 0);
 }
 
 void stop_tlb_counting(TLBCounters* counters) {
@@ -169,15 +217,21 @@ void stop_tlb_counting(TLBCounters* counters) {
 
     ioctl(counters->fd_dtlb_load_misses, PERF_EVENT_IOC_DISABLE, 0);
     ioctl(counters->fd_dtlb_store_misses, PERF_EVENT_IOC_DISABLE, 0);
-
+    ioctl(counters->fd_all_loads, PERF_EVENT_IOC_DISABLE, 0);
+    ioctl(counters->fd_all_stores, PERF_EVENT_IOC_DISABLE, 0);
+    
     read(counters->fd_dtlb_load_misses, &counters->dtlb_load_misses, sizeof(uint64_t));
     read(counters->fd_dtlb_store_misses, &counters->dtlb_store_misses, sizeof(uint64_t));
+    read(counters->fd_all_loads, &counters->all_loads, sizeof(uint64_t));
+    read(counters->fd_all_stores, &counters->all_stores, sizeof(uint64_t));
 }
 
 void cleanup_tlb_counters(TLBCounters* counters) {
     if (counters) {
         close(counters->fd_dtlb_load_misses);
         close(counters->fd_dtlb_store_misses);
+        close(counters->fd_all_loads);
+        close(counters->fd_all_stores);
         free(counters);
     }
 }
@@ -219,6 +273,25 @@ uint64_t get_time_ns() {
     return ts.tv_sec * 1000000000ULL + ts.tv_nsec;
 }
 
+// Function to promote pages to huge pages
+int promote_to_huge_pages(void* addr, size_t size, const char* tier_info) {
+    // Ensure the address is aligned to HUGE_PAGE_SIZE boundary
+    uintptr_t aligned_addr = (uintptr_t)addr & ~(HUGE_PAGE_SIZE - 1);
+    size_t aligned_size = size + ((uintptr_t)addr - aligned_addr);
+    
+    // Round up to the nearest multiple of HUGE_PAGE_SIZE
+    aligned_size = (aligned_size + HUGE_PAGE_SIZE - 1) & ~(HUGE_PAGE_SIZE - 1);
+    
+    int result = madvise((void*)aligned_addr, aligned_size, MADV_HUGEPAGE);
+    if (result != 0) {
+        printf("HUGEPAGE FAILED [%s]: %s\n", tier_info, strerror(errno));
+        return 0;
+    }
+    
+    printf("HUGEPAGE SUCCESS [%s]\n", tier_info);
+    return 1;
+}
+
 void* allocate_and_bind_to_numa(size_t size, size_t number, int numa_node) {
     // Step 1: Allocate memory using mmap
     void* addr = mmap(NULL, size * number, PROT_READ | PROT_WRITE,
@@ -237,10 +310,18 @@ void* allocate_and_bind_to_numa(size_t size, size_t number, int numa_node) {
         return NULL;
     }
 
-    // Step 3: Access the memory to ensure physical allocation
+    // Step 3: Apply MADV_HUGEPAGE to encourage use of huge pages
+    const char* node_names[] = {"Local", "Remote", "PMEM", "Unknown"};
+    const char* node_name = (numa_node >= 0 && numa_node <= 2) ? 
+                          node_names[numa_node] : node_names[3];
+    char tier_info[64];
+    sprintf(tier_info, "Initial allocation on %s", node_name);
+    promote_to_huge_pages(addr, size * number, tier_info);
+
+    // Step 4: Access the memory to ensure physical allocation
     memset(addr, 1, size * number);
 
-    // Step 4: Verify the memory is actually on the requested NUMA node
+    // Step 5: Verify the memory is actually on the requested NUMA node
     void** pages = malloc(number * sizeof(void*));
     int* status = malloc(number * sizeof(int));
 
@@ -288,6 +369,7 @@ void move_pages_to_node(void* addr, size_t size, size_t number, int target_node)
         nodes[i] = target_node;
     }
 
+    // Move the pages
     if (syscall(SYS_move_pages, 0, number, pages, nodes, status, MPOL_MF_MOVE) != 0) {
         perror("move_pages failed");
         free(pages);
@@ -295,6 +377,14 @@ void move_pages_to_node(void* addr, size_t size, size_t number, int target_node)
         free(status);
         exit(EXIT_FAILURE);
     }
+    
+    // Try to promote pages to huge pages after migration
+    const char* node_names[] = {"Local", "Remote", "PMEM", "Unknown"};
+    const char* target_name = (target_node >= 0 && target_node <= 2) ? 
+                            node_names[target_node] : node_names[3];
+    char tier_info[64];
+    sprintf(tier_info, "After migration to %s", target_name);
+    promote_to_huge_pages(addr, size * number, tier_info);
 
     free(pages);
     free(nodes);
@@ -305,6 +395,9 @@ typedef struct {
     double time;
     uint64_t tlb_load_misses;
     uint64_t tlb_store_misses;
+    uint64_t all_loads;
+    uint64_t all_stores;
+    double tlb_miss_rate;  // Combined TLB miss rate
 } AccessResult;
 
 AccessResult access_memory_with_tlb(void* addr, int* offsets, int offset_count, MemAccessMode mode, TLBCounters* tlb_counters) {
@@ -370,6 +463,19 @@ AccessResult access_memory_with_tlb(void* addr, int* offsets, int offset_count, 
     result.time = (double)total_time / offset_count;
     result.tlb_load_misses = tlb_counters->dtlb_load_misses;
     result.tlb_store_misses = tlb_counters->dtlb_store_misses;
+    result.all_loads = tlb_counters->all_loads;
+    result.all_stores = tlb_counters->all_stores;
+    
+    // Calculate TLB miss rate
+    uint64_t total_misses = result.tlb_load_misses + result.tlb_store_misses;
+    uint64_t total_ops = result.all_loads + result.all_stores;
+    
+    // Avoid division by zero
+    if (total_ops > 0) {
+        result.tlb_miss_rate = (double)total_misses / total_ops * 100.0; // as percentage
+    } else {
+        result.tlb_miss_rate = 0.0;
+    }
 
     return result;
 }
@@ -383,6 +489,11 @@ typedef struct {
 
 BenchmarkResult benchmark_memory_ops(int source_node, int target_node, MemAccessMode mode) {
     BenchmarkResult result = { 0 };
+    
+    const char* node_names[] = {"Local", "Remote", "PMEM", "Unknown"};
+    printf("\nBenchmarking memory operations: %s → %s\n",
+           (source_node >= 0 && source_node <= 2) ? node_names[source_node] : node_names[3],
+           (target_node >= 0 && target_node <= 2) ? node_names[target_node] : node_names[3]);
 
     TLBCounters* tlb_counters = setup_tlb_counters();
     if (!tlb_counters) {
@@ -432,30 +543,30 @@ void print_access_latency_table_with_tlb(const char* operation_type,
     const AccessResult* remote_local, const AccessResult* remote_remote, const AccessResult* remote_pmem,
     const AccessResult* pmem_local, const AccessResult* pmem_remote, const AccessResult* pmem_pmem) {
 
-    printf("\n--- %s Access Latency (ns) with TLB Misses ---\n", operation_type);
-    printf("%-12s | %-33s | %-33s | %-33s\n", "Source/Dest", "Local", "Remote", "PMEM");
-    printf("-------------+-----------------------------------+-----------------------------------+-------------------------------------\n");
+    printf("\n--- %s Access Latency (ns) and TLB Stats ---\n", operation_type);
+    printf("%-12s | %-45s | %-45s | %-45s\n", "Source/Dest", "Local", "Remote", "PMEM");
+    printf("-------------+-----------------------------------------------+-----------------------------------------------+------------------------------------------------\n");
 
-    // Print each row with latency and TLB miss information
-    printf("%-12s | %7.2f ns (L:%7lu, S:%7lu) | %7.2f ns (L:%7lu, S:%7lu) | %7.2f ns (L:%7lu, S:%7lu)\n",
+    // Print each row with latency, TLB misses, and miss rate
+    printf("%-12s | %7.2f ns (L:%7lu, S:%7lu, MR:%6.2f%%) | %7.2f ns (L:%7lu, S:%7lu, MR:%6.2f%%) | %7.2f ns (L:%7lu, S:%7lu, MR:%6.2f%%)\n",
         "Local",
-        local_local->time, local_local->tlb_load_misses, local_local->tlb_store_misses,
-        local_remote->time, local_remote->tlb_load_misses, local_remote->tlb_store_misses,
-        local_pmem->time, local_pmem->tlb_load_misses, local_pmem->tlb_store_misses);
+        local_local->time, local_local->tlb_load_misses, local_local->tlb_store_misses, local_local->tlb_miss_rate,
+        local_remote->time, local_remote->tlb_load_misses, local_remote->tlb_store_misses, local_remote->tlb_miss_rate,
+        local_pmem->time, local_pmem->tlb_load_misses, local_pmem->tlb_store_misses, local_pmem->tlb_miss_rate);
 
-    printf("%-12s | %7.2f ns (L:%7lu, S:%7lu) | %7.2f ns (L:%7lu, S:%7lu) | %7.2f ns (L:%7lu, S:%7lu)\n",
+    printf("%-12s | %7.2f ns (L:%7lu, S:%7lu, MR:%6.2f%%) | %7.2f ns (L:%7lu, S:%7lu, MR:%6.2f%%) | %7.2f ns (L:%7lu, S:%7lu, MR:%6.2f%%)\n",
         "Remote",
-        remote_local->time, remote_local->tlb_load_misses, remote_local->tlb_store_misses,
-        remote_remote->time, remote_remote->tlb_load_misses, remote_remote->tlb_store_misses,
-        remote_pmem->time, remote_pmem->tlb_load_misses, remote_pmem->tlb_store_misses);
+        remote_local->time, remote_local->tlb_load_misses, remote_local->tlb_store_misses, remote_local->tlb_miss_rate,
+        remote_remote->time, remote_remote->tlb_load_misses, remote_remote->tlb_store_misses, remote_remote->tlb_miss_rate,
+        remote_pmem->time, remote_pmem->tlb_load_misses, remote_pmem->tlb_store_misses, remote_pmem->tlb_miss_rate);
 
-    printf("%-12s | %7.2f ns (L:%7lu, S:%7lu) | %7.2f ns (L:%7lu, S:%7lu) | %7.2f ns (L:%7lu, S:%7lu)\n",
+    printf("%-12s | %7.2f ns (L:%7lu, S:%7lu, MR:%6.2f%%) | %7.2f ns (L:%7lu, S:%7lu, MR:%6.2f%%) | %7.2f ns (L:%7lu, S:%7lu, MR:%6.2f%%)\n",
         "PMEM",
-        pmem_local->time, pmem_local->tlb_load_misses, pmem_local->tlb_store_misses,
-        pmem_remote->time, pmem_remote->tlb_load_misses, pmem_remote->tlb_store_misses,
-        pmem_pmem->time, pmem_pmem->tlb_load_misses, pmem_pmem->tlb_store_misses);
+        pmem_local->time, pmem_local->tlb_load_misses, pmem_local->tlb_store_misses, pmem_local->tlb_miss_rate,
+        pmem_remote->time, pmem_remote->tlb_load_misses, pmem_remote->tlb_store_misses, pmem_remote->tlb_miss_rate,
+        pmem_pmem->time, pmem_pmem->tlb_load_misses, pmem_pmem->tlb_store_misses, pmem_pmem->tlb_miss_rate);
 
-    printf("\nL: DTLB Load Misses, S: DTLB Store Misses\n");
+    printf("\nL: STLB Load Misses, S: STLB Store Misses, MR: TLB Miss Rate (percentage)\n");
 }
 
 // Function to print the Migration Latency table
@@ -511,10 +622,52 @@ void run_benchmark_for_mode(MemAccessMode mode) {
         pmem_to_local.move_time, pmem_to_remote.move_time);
 }
 
+// Function to check if huge pages are supported and available
+void check_hugepage_support() {
+    FILE* fp = fopen("/proc/meminfo", "r");
+    if (!fp) {
+        perror("Failed to open /proc/meminfo");
+        return;
+    }
+    
+    char line[256];
+    int hugepages_total = 0;
+    int hugepages_free = 0;
+    int hugepage_size_kb = 0;
+    char thp_enabled[64] = "unknown";
+    
+    while (fgets(line, sizeof(line), fp)) {
+        if (sscanf(line, "HugePages_Total: %d", &hugepages_total) == 1) continue;
+        if (sscanf(line, "HugePages_Free: %d", &hugepages_free) == 1) continue;
+        if (sscanf(line, "Hugepagesize: %d kB", &hugepage_size_kb) == 1) continue;
+    }
+    
+    fclose(fp);
+    
+    // Check Transparent Hugepage status
+    fp = fopen("/sys/kernel/mm/transparent_hugepage/enabled", "r");
+    if (fp) {
+        if (fgets(thp_enabled, sizeof(thp_enabled), fp)) {
+            // Remove newline if present
+            char* newline = strchr(thp_enabled, '\n');
+            if (newline) *newline = '\0';
+        }
+        fclose(fp);
+    }
+    
+    printf("Huge Page Support:\n");
+    printf("  Total Huge Pages: %d\n", hugepages_total);
+    printf("  Free Huge Pages: %d\n", hugepages_free);
+    printf("  Huge Page Size: %d kB\n", hugepage_size_kb);
+    printf("  Transparent Hugepages: %s\n", thp_enabled);
+    printf("  Using MADV_HUGEPAGE for transparent huge page promotion\n");
+}
+
 int main() {
     printf("NUMA and PMEM Page Allocation, Migration, and Access Benchmark with TLB Monitoring\n");
 
     check_cpu_features();
+    check_hugepage_support();
 
     if (numa_available() < 0) {
         fprintf(stderr, "NUMA is not supported on this system\n");
@@ -524,6 +677,7 @@ int main() {
     srand(time(NULL));
 
     printf("Running benchmarks for different memory access methods...\n");
+    printf("Using transparent hugepages to promote 4KB pages to 2MB huge pages where possible\n");
 
     // Run READ benchmark
     run_benchmark_for_mode(READ);
