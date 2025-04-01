@@ -13,11 +13,15 @@
 #include "Metrics.hpp"
 #include "Utils.hpp"
 
-struct PageMetadata {
+#define HUGE_PAGE_SIZE (2 * 1024 * 1024)
+
+struct PageMetadata
+{
   std::atomic<PageLayer> page_layer;
   std::atomic<uint64_t> last_access_time_ms;
 
-  PageMetadata(PageLayer layer = PageLayer::NUMA_LOCAL) : page_layer(layer) {
+  PageMetadata(PageLayer layer = PageLayer::NUMA_LOCAL) : page_layer(layer)
+  {
     auto now = boost::chrono::steady_clock::now();
     auto duration = now.time_since_epoch();
     auto ms =
@@ -27,20 +31,17 @@ struct PageMetadata {
   }
 };
 
-struct PageTableEntry {
+struct PageTableEntry
+{
   void *page_address;
   PageMetadata metadata;
-
-  // NOTICE: we only "protect" page address.
-  // though page move syscall will not change VPN,
-  // we prevent page being accessed during migration.
-  mutable boost::shared_mutex mutex;
 
   PageTableEntry(void *addr = 0, PageLayer layer = PageLayer::NUMA_LOCAL)
       : page_address(addr), metadata(layer) {}
 };
 
-class PageTable {
+class PageTable
+{
 public:
   PageTable(const std::vector<ClientConfig> &client_configs,
             ServerMemoryConfig *server_config);
@@ -56,6 +57,9 @@ public:
   // Write operations
   void accessPage(size_t page_id, OperationType mode);
   void migratePage(size_t page_id, PageLayer new_layer);
+
+  // Promotion to huge pages
+  void promoteToHugePage();
 
 private:
   void _allocateMemory();

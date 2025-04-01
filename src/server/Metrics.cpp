@@ -1,6 +1,7 @@
 #include "Metrics.hpp"
 
-void Metrics::printMetricsThreeTiers() const {
+void Metrics::printMetricsThreeTiers() const
+{
   LOG_INFO("======== Memory Access Metrics ========");
   LOG_INFO("Access Counts:");
   LOG_INFO("  NUMA Local:  " << local_access_count_.load());
@@ -29,7 +30,8 @@ void Metrics::printMetricsThreeTiers() const {
   LOG_INFO("  Local -> PMEM: " << local_to_pmem_count_.load());
   LOG_INFO("  PMEM -> Local: " << pmem_to_local_count_.load());
 
-  if (total_latency_.load() > 0) {
+  if (total_latency_.load() > 0)
+  {
     LOG_INFO("Throughput:");
     uint64_t total_access = local_access_count_.load() +
                             remote_access_count_.load() +
@@ -41,7 +43,8 @@ void Metrics::printMetricsThreeTiers() const {
   LOG_INFO("===================================");
 }
 
-void Metrics::printMetricsTwoTiers() const {
+void Metrics::printMetricsTwoTiers() const
+{
   LOG_INFO("======== Memory Access Metrics (Two Tiers) ========");
   LOG_INFO("Access Counts:");
   LOG_INFO("  DRAM: " << local_access_count_.load());
@@ -65,7 +68,8 @@ void Metrics::printMetricsTwoTiers() const {
   LOG_INFO("  DRAM -> PMEM: " << local_to_pmem_count_.load());
   LOG_INFO("  PMEM -> DRAM: " << pmem_to_local_count_.load());
 
-  if (total_latency_.load() > 0) {
+  if (total_latency_.load() > 0)
+  {
     LOG_INFO("Throughput:");
     uint64_t total_access =
         local_access_count_.load() + pmem_access_count_.load();
@@ -76,9 +80,11 @@ void Metrics::printMetricsTwoTiers() const {
   LOG_INFO("==========================================");
 }
 
-void Metrics::outputLatencyCDFToFile(const std::string &filename) const {
+void Metrics::outputLatencyCDFToFile(const std::string &filename) const
+{
   std::ofstream outfile(filename);
-  if (!outfile) {
+  if (!outfile)
+  {
     LOG_ERROR("Failed to open file: " << filename);
     return;
   }
@@ -88,7 +94,8 @@ void Metrics::outputLatencyCDFToFile(const std::string &filename) const {
 
   outfile << "Min," << acc::min(access_latency_) << "\n";
   // Write each percentile point
-  for (size_t i = 0; i < std::size(probabilities); i++) {
+  for (size_t i = 0; i < std::size(probabilities); i++)
+  {
     double percentile = probabilities[i];
     uint64_t latency = acc::extended_p_square(access_latency_)[i];
     outfile << percentile << "," << latency << "\n";
@@ -100,7 +107,8 @@ void Metrics::outputLatencyCDFToFile(const std::string &filename) const {
   LOG_INFO("CDF data written to: " << filename);
 }
 
-void Metrics::reset() {
+void Metrics::reset()
+{
   local_access_count_ = 0;
   remote_access_count_ = 0;
   pmem_access_count_ = 0;
@@ -115,7 +123,8 @@ void Metrics::reset() {
                                         probabilities};
 }
 
-void Metrics::periodicalMetrics(ServerMemoryConfig *server_config) {
+void Metrics::periodicalMetrics(ServerMemoryConfig *server_config)
+{
   // Store current counter values to ensure consistency
   uint64_t total_latency_now = total_latency_.load();
   uint64_t local_access_count_now = local_access_count_.load();
@@ -138,7 +147,8 @@ void Metrics::periodicalMetrics(ServerMemoryConfig *server_config) {
   // Calculate throughput
   double throughput = 0.0;
   double avg_latency = 0.0;
-  if (current_latency > 0) {
+  if (current_latency > 0)
+  {
     throughput = static_cast<double>(current_access) * 1e9 /
                  static_cast<double>(current_latency);
     avg_latency = static_cast<double>(current_latency) /
@@ -155,7 +165,8 @@ void Metrics::periodicalMetrics(ServerMemoryConfig *server_config) {
   std::ofstream out_file;
   out_file.open("result/periodic_metrics.csv", std::ios_base::app);
 
-  if (!out_file.is_open()) {
+  if (!out_file.is_open())
+  {
     // If file couldn't be opened, log error and return
     LOG_ERROR("Failed to open periodic_metrics.csv for writing");
     return;
@@ -163,7 +174,8 @@ void Metrics::periodicalMetrics(ServerMemoryConfig *server_config) {
 
   // Check if file is empty (need to write header)
   out_file.seekp(0, std::ios::end);
-  if (out_file.tellp() == 0) {
+  if (out_file.tellp() == 0)
+  {
     out_file << "Latency(ns),Throughput(ops/"
                 "s),LocalAccess,RemoteAccess,PmemAccess,TotalAccess,"
                 "LocalCount,RemoteCount,PmemCount"
