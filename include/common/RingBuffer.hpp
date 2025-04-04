@@ -10,7 +10,7 @@ template <typename T> class RingBuffer {
 public:
   RingBuffer(size_t capacity) : buf_(capacity) {}
 
-  bool push(const T &item) {
+  bool push(const T& item) {
     boost::unique_lock<boost::mutex> lock(mutex_);
     if (buf_.full()) {
       return false;
@@ -20,7 +20,7 @@ public:
     return true;
   }
 
-  bool pop(T &item) {
+  bool pop(T& item) {
     boost::unique_lock<boost::mutex> lock(mutex_);
     if (buf_.empty()) {
       return false;

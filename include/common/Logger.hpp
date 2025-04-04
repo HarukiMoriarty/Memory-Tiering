@@ -9,15 +9,15 @@ class Logger {
 public:
   enum LogLevel { trace, debug, info, warning, error, fatal };
 
-  static Logger &getInstance();
+  static Logger& getInstance();
   void init();
   void setLogLevel(LogLevel level);
   static LogLevel getLogLevelFromEnv();
 
 private:
   Logger() = default;
-  Logger(const Logger &) = delete;
-  Logger &operator=(const Logger &) = delete;
+  Logger(const Logger&) = delete;
+  Logger& operator=(const Logger&) = delete;
 };
 
 // Simple macros that use BOOST_LOG_TRIVIAL directly

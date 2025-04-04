@@ -1,16 +1,17 @@
 #include "Generator.hpp"
 
 MemoryAccessGenerator::MemoryAccessGenerator(AccessPattern pattern,
-                                             size_t memory_space_size)
-    : pattern_(pattern), memory_space_size_(memory_space_size) {
+  size_t memory_space_size)
+  : pattern_(pattern), memory_space_size_(memory_space_size) {
   std::random_device rd;
   rng_ = std::mt19937(rd());
 
   // HOT distribution
   if (pattern == AccessPattern::UNIFORM) {
     uniform_dist_ =
-        std::uniform_int_distribution<size_t>(0, memory_space_size_ - 1);
-  } else if (pattern == AccessPattern::HOT) {
+      std::uniform_int_distribution<size_t>(0, memory_space_size_ - 1);
+  }
+  else if (pattern == AccessPattern::HOT) {
     std::vector<size_t> all_pages(memory_space_size_);
     for (size_t i = 0; i < memory_space_size_; i++) {
       all_pages[i] = i;
@@ -24,7 +25,8 @@ MemoryAccessGenerator::MemoryAccessGenerator(AccessPattern pattern,
     }
 
     hot_dist_ = std::uniform_int_distribution<size_t>(0, hot_count - 1);
-  } else if (pattern == AccessPattern::ZIPFIAN) {
+  }
+  else if (pattern == AccessPattern::ZIPFIAN) {
     zipf_prob_.resize(memory_space_size_);
 
     double sum = 0.0;
@@ -40,7 +42,7 @@ MemoryAccessGenerator::MemoryAccessGenerator(AccessPattern pattern,
     std::shuffle(zipf_prob_.begin(), zipf_prob_.end(), rng_);
 
     zipf_dist_ = std::discrete_distribution<size_t>(zipf_prob_.begin(),
-                                                    zipf_prob_.end());
+      zipf_prob_.end());
   }
 }
 

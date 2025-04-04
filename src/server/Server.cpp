@@ -1,11 +1,11 @@
 #include "Server.hpp"
 
-Server::Server(RingBuffer<ClientMessage> &client_buffer,
-               const std::vector<ClientConfig> &client_configs,
-               ServerMemoryConfig *server_config, PolicyConfig *policy_config,
-               size_t sample_rate)
-    : client_buffer_(client_buffer), sample_rate_(sample_rate),
-      server_config_(server_config), policy_config_(policy_config) {
+Server::Server(RingBuffer<ClientMessage>& client_buffer,
+  const std::vector<ClientConfig>& client_configs,
+  ServerMemoryConfig* server_config, PolicyConfig* policy_config,
+  size_t sample_rate)
+  : client_buffer_(client_buffer), sample_rate_(sample_rate),
+  server_config_(server_config), policy_config_(policy_config) {
   // Calculate load memory pages
   size_t client_total_page = 0;
   if (server_config_->num_tiers == 2) {
@@ -14,7 +14,8 @@ Server::Server(RingBuffer<ClientMessage> &client_buffer,
       client_total_page += client.tier_sizes[0];
       client_total_page += client.tier_sizes[1];
     }
-  } else if (server_config_->num_tiers == 3) {
+  }
+  else if (server_config_->num_tiers == 3) {
     for (ClientConfig client : client_configs) {
       base_page_id_.push_back(client_total_page);
       client_total_page += client.tier_sizes[0];
@@ -37,14 +38,14 @@ Server::~Server() {
 }
 
 // Helper function to handle a ClientMessage
-void Server::handleClientMessage(const ClientMessage &msg) {
+void Server::handleClientMessage(const ClientMessage& msg) {
   if (msg.op_type == OperationType::END) {
     client_done_flags_[msg.client_id] = true;
     LOG_DEBUG("Client " << msg.client_id << " sent END command.");
 
     // Check if all clients are done
     if (std::all_of(client_done_flags_.begin(), client_done_flags_.end(),
-                    [](bool done) { return done; })) {
+      [](bool done) { return done; })) {
       LOG_INFO("All clients sent END command.");
       signalShutdown();
     }
@@ -84,7 +85,7 @@ void Server::_runScannerThread() {
 
 void Server::_runPeriodicalMetricsThread() {
   LOG_INFO("Periodical metric thread start!");
-  Metrics &metrics = Metrics::getInstance();
+  Metrics& metrics = Metrics::getInstance();
   while (!_shouldShutdown()) {
     boost::this_thread::sleep_for(boost::chrono::seconds(sample_rate_));
     metrics.periodicalMetrics(server_config_);
@@ -108,7 +109,7 @@ void Server::start() {
   boost::thread server_thread(&Server::_runManagerThread, this);
   boost::thread policy_thread(&Server::_runScannerThread, this);
   boost::thread periodical_metric_thread(&Server::_runPeriodicalMetricsThread,
-                                         this);
+    this);
 
   // Join threads
   server_thread.join();

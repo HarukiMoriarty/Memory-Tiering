@@ -12,13 +12,13 @@
 namespace logging = boost::log;
 namespace keywords = boost::log::keywords;
 
-Logger &Logger::getInstance() {
+Logger& Logger::getInstance() {
   static Logger instance;
   return instance;
 }
 
 Logger::LogLevel Logger::getLogLevelFromEnv() {
-  const char *level = std::getenv("LOG_LEVEL");
+  const char* level = std::getenv("LOG_LEVEL");
   if (!level) {
     return LogLevel::info; // Default level set to info
   }
@@ -44,14 +44,14 @@ Logger::LogLevel Logger::getLogLevelFromEnv() {
 
 void Logger::setLogLevel(LogLevel level) {
   logging::core::get()->set_filter(
-      logging::trivial::severity >=
-      static_cast<logging::trivial::severity_level>(level));
+    logging::trivial::severity >=
+    static_cast<logging::trivial::severity_level>(level));
 }
 
 void Logger::init() {
   // We only use console logging
   logging::add_console_log(
-      std::cout, keywords::format = "[%TimeStamp%] [%Severity%] %Message%");
+    std::cout, keywords::format = "[%TimeStamp%] [%Severity%] %Message%");
 
   logging::add_common_attributes();
 

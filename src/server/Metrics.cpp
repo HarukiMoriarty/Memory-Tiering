@@ -34,10 +34,10 @@ void Metrics::printMetricsThreeTiers() const
   {
     LOG_INFO("Throughput:");
     uint64_t total_access = local_access_count_.load() +
-                            remote_access_count_.load() +
-                            pmem_access_count_.load();
+      remote_access_count_.load() +
+      pmem_access_count_.load();
     double throughput = static_cast<double>(total_access) * 1e9 /
-                        static_cast<double>(total_latency_.load());
+      static_cast<double>(total_latency_.load());
     LOG_INFO("  Throughput: " << throughput << " ops/sec");
   }
   LOG_INFO("===================================");
@@ -72,15 +72,15 @@ void Metrics::printMetricsTwoTiers() const
   {
     LOG_INFO("Throughput:");
     uint64_t total_access =
-        local_access_count_.load() + pmem_access_count_.load();
+      local_access_count_.load() + pmem_access_count_.load();
     double throughput = static_cast<double>(total_access) * 1e9 /
-                        static_cast<double>(total_latency_.load());
+      static_cast<double>(total_latency_.load());
     LOG_INFO("  Throughput: " << throughput << " ops/sec");
   }
   LOG_INFO("==========================================");
 }
 
-void Metrics::outputLatencyCDFToFile(const std::string &filename) const
+void Metrics::outputLatencyCDFToFile(const std::string& filename) const
 {
   std::ofstream outfile(filename);
   if (!outfile)
@@ -119,11 +119,11 @@ void Metrics::reset()
   local_to_pmem_count_ = 0;
   pmem_to_local_count_ = 0;
   total_latency_ = 0;
-  access_latency_ = AccumulatorType{acc::tag::extended_p_square::probabilities =
-                                        probabilities};
+  access_latency_ = AccumulatorType{ acc::tag::extended_p_square::probabilities =
+                                        probabilities };
 }
 
-void Metrics::periodicalMetrics(ServerMemoryConfig *server_config)
+void Metrics::periodicalMetrics(ServerMemoryConfig* server_config)
 {
   // Store current counter values to ensure consistency
   uint64_t total_latency_now = total_latency_.load();
@@ -134,15 +134,15 @@ void Metrics::periodicalMetrics(ServerMemoryConfig *server_config)
   // Calculate deltas since last period
   uint64_t current_latency = total_latency_now - last_period_latency_;
   uint64_t current_local_access_count =
-      local_access_count_now - last_period_local_access_count_;
+    local_access_count_now - last_period_local_access_count_;
   uint64_t current_remote_access_count =
-      remote_access_count_now - last_period_remote_access_count_;
+    remote_access_count_now - last_period_remote_access_count_;
   uint64_t current_pmem_access_count =
-      pmem_access_count_now - last_period_pmem_access_count_;
+    pmem_access_count_now - last_period_pmem_access_count_;
 
   uint64_t current_access = current_local_access_count +
-                            current_remote_access_count +
-                            current_pmem_access_count;
+    current_remote_access_count +
+    current_pmem_access_count;
 
   // Calculate throughput
   double throughput = 0.0;
@@ -150,9 +150,9 @@ void Metrics::periodicalMetrics(ServerMemoryConfig *server_config)
   if (current_latency > 0)
   {
     throughput = static_cast<double>(current_access) * 1e9 /
-                 static_cast<double>(current_latency);
+      static_cast<double>(current_latency);
     avg_latency = static_cast<double>(current_latency) /
-                  static_cast<double>(current_access);
+      static_cast<double>(current_access);
   }
 
   // Update last period values for next report
@@ -177,18 +177,18 @@ void Metrics::periodicalMetrics(ServerMemoryConfig *server_config)
   if (out_file.tellp() == 0)
   {
     out_file << "Latency(ns),Throughput(ops/"
-                "s),LocalAccess,RemoteAccess,PmemAccess,TotalAccess,"
-                "LocalCount,RemoteCount,PmemCount"
-             << std::endl;
+      "s),LocalAccess,RemoteAccess,PmemAccess,TotalAccess,"
+      "LocalCount,RemoteCount,PmemCount"
+      << std::endl;
   }
 
   // Write metrics to file
   out_file << avg_latency << "," << throughput << ","
-           << current_local_access_count << "," << current_remote_access_count
-           << "," << current_pmem_access_count << "," << current_access << ","
-           << server_config->local_numa.count << ","
-           << server_config->remote_numa.count << ","
-           << server_config->pmem.count << std::endl;
+    << current_local_access_count << "," << current_remote_access_count
+    << "," << current_pmem_access_count << "," << current_access << ","
+    << server_config->local_numa.count << ","
+    << server_config->remote_numa.count << ","
+    << server_config->pmem.count << std::endl;
 
   out_file.close();
 }

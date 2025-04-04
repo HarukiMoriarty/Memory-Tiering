@@ -18,13 +18,13 @@
 
 class Server {
 public:
-  Server(RingBuffer<ClientMessage> &client_buffer,
-         const std::vector<ClientConfig> &client_configs,
-         ServerMemoryConfig *server_config, PolicyConfig *policy_config,
-         size_t sample_rate);
+  Server(RingBuffer<ClientMessage>& client_buffer,
+    const std::vector<ClientConfig>& client_configs,
+    ServerMemoryConfig* server_config, PolicyConfig* policy_config,
+    size_t sample_rate);
   ~Server();
 
-  void handleClientMessage(const ClientMessage &msg);
+  void handleClientMessage(const ClientMessage& msg);
 
   void start();
   void signalShutdown();
@@ -39,13 +39,13 @@ private:
   bool _shouldShutdown();
 
   // private variable
-  RingBuffer<ClientMessage> &client_buffer_;
-  PageTable *page_table_;
-  Scanner *scanner_;
+  RingBuffer<ClientMessage>& client_buffer_;
+  PageTable* page_table_;
+  Scanner* scanner_;
   size_t sample_rate_;
 
-  ServerMemoryConfig *server_config_;
-  PolicyConfig *policy_config_;
+  ServerMemoryConfig* server_config_;
+  PolicyConfig* policy_config_;
   std::vector<bool> client_done_flags_;
 
   // Base page id for each memory layer

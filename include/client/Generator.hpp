@@ -16,7 +16,7 @@ private:
   size_t memory_space_size_; // Total memory size to generate accesses for
 
   // Operation type
-  std::uniform_real_distribution<double> type_dis{0.0, 1.0};
+  std::uniform_real_distribution<double> type_dis{ 0.0, 1.0 };
 
   // UNIFORM
   std::uniform_int_distribution<size_t> uniform_dist_;

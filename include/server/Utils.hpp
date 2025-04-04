@@ -42,7 +42,7 @@ inline uint64_t get_time_ns() {
  * Flush cache line to ensure memory operation isn't served from CPU cache
  * @param addr Address to flush from cache
  */
-inline void flush_cache(void *addr) { _mm_clflush(addr); }
+inline void flush_cache(void* addr) { _mm_clflush(addr); }
 
 //======================================
 // Memory Allocation
@@ -54,9 +54,9 @@ inline void flush_cache(void *addr) { _mm_clflush(addr); }
  * @param number Number of pages to allocate
  * @return Pointer to allocated memory
  */
-inline void *allocate_pages(size_t size, size_t number) {
-  void *mem = mmap(NULL, size * number, PROT_READ | PROT_WRITE,
-                   MAP_PRIVATE | MAP_ANONYMOUS | MAP_POPULATE, -1, 0);
+inline void* allocate_pages(size_t size, size_t number) {
+  void* mem = mmap(NULL, size * number, PROT_READ | PROT_WRITE,
+    MAP_PRIVATE | MAP_ANONYMOUS | MAP_POPULATE, -1, 0);
   if (mem == MAP_FAILED) {
     perror("mmap failed");
     exit(EXIT_FAILURE);
@@ -71,11 +71,11 @@ inline void *allocate_pages(size_t size, size_t number) {
  * @param numa_node Target NUMA node
  * @return Pointer to allocated memory
  */
-inline void *allocate_and_bind_to_numa(size_t size, size_t number,
-                                       int numa_node) {
+inline void* allocate_and_bind_to_numa(size_t size, size_t number,
+  int numa_node) {
   // Allocate memory
-  void *addr = mmap(NULL, size * number, PROT_READ | PROT_WRITE,
-                    MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+  void* addr = mmap(NULL, size * number, PROT_READ | PROT_WRITE,
+    MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
   if (addr == MAP_FAILED) {
     perror("mmap failed");
     return NULL;
@@ -84,7 +84,7 @@ inline void *allocate_and_bind_to_numa(size_t size, size_t number,
   // Bind to NUMA node
   unsigned long nodemask = (1UL << numa_node);
   if (syscall(SYS_mbind, addr, size, MPOL_BIND, &nodemask, sizeof(nodemask) * 8,
-              MPOL_MF_MOVE | MPOL_MF_STRICT) != 0) {
+    MPOL_MF_MOVE | MPOL_MF_STRICT) != 0) {
     perror("mbind syscall failed");
     munmap(addr, size * number);
     return NULL;
@@ -104,9 +104,9 @@ inline void *allocate_and_bind_to_numa(size_t size, size_t number,
  * @param addr Page address
  * @param target_node Target NUMA node
  */
-inline void move_page_to_node(void *addr, int target_node) {
-  void *pages[1] = {addr};
-  int nodes[1] = {target_node};
+inline void move_page_to_node(void* addr, int target_node) {
+  void* pages[1] = { addr };
+  int nodes[1] = { target_node };
   int status[1];
 
   if (syscall(SYS_move_pages, 0, 1, pages, nodes, status, MPOL_MF_MOVE) != 0) {
@@ -122,11 +122,11 @@ inline void move_page_to_node(void *addr, int target_node) {
  * @param number Number of pages to move
  * @param target_node Target NUMA node
  */
-inline void move_pages_to_node(void *addr, size_t size, size_t number,
-                               int target_node) {
-  void **pages = (void **)malloc(number * sizeof(void *));
-  int *nodes = (int *)malloc(number * sizeof(int));
-  int *status = (int *)malloc(number * sizeof(int));
+inline void move_pages_to_node(void* addr, size_t size, size_t number,
+  int target_node) {
+  void** pages = (void**)malloc(number * sizeof(void*));
+  int* nodes = (int*)malloc(number * sizeof(int));
+  int* status = (int*)malloc(number * sizeof(int));
   if (!pages || !nodes || !status) {
     perror("Memory allocation failed");
     free(pages);
@@ -137,13 +137,13 @@ inline void move_pages_to_node(void *addr, size_t size, size_t number,
 
   // Setup page and node arrays
   for (size_t i = 0; i < number; i++) {
-    pages[i] = (char *)addr + i * size;
+    pages[i] = (char*)addr + i * size;
     nodes[i] = target_node;
   }
 
   // Perform migration
   if (syscall(SYS_move_pages, 0, number, pages, nodes, status, MPOL_MF_MOVE) !=
-      0) {
+    0) {
     perror("move_pages failed");
     free(pages);
     free(nodes);
@@ -169,11 +169,11 @@ inline void move_pages_to_node(void *addr, size_t size, size_t number,
  * @param current_tier Current memory tier
  * @param target_tier Target memory tier
  */
-inline void migrate_page(void *addr, PageLayer current_tier,
-                         PageLayer target_tier) {
-  int target_node = (target_tier == PageLayer::NUMA_LOCAL)    ? 0
-                    : (target_tier == PageLayer::NUMA_REMOTE) ? 1
-                                                              : 2;
+inline void migrate_page(void* addr, PageLayer current_tier,
+  PageLayer target_tier) {
+  int target_node = (target_tier == PageLayer::NUMA_LOCAL) ? 0
+    : (target_tier == PageLayer::NUMA_REMOTE) ? 1
+    : 2;
   return move_page_to_node(addr, target_node);
 }
 
@@ -187,8 +187,8 @@ inline void migrate_page(void *addr, PageLayer current_tier,
  * @param mode Memory access mode (read/write)
  * @return Access time in nanoseconds
  */
-inline uint64_t access_page(void *addr, OperationType mode) {
-  volatile uint64_t *page = (volatile uint64_t *)addr;
+inline uint64_t access_page(void* addr, OperationType mode) {
+  volatile uint64_t* page = (volatile uint64_t*)addr;
 
   // Ensure cache is flushed first
   flush_cache(addr);
@@ -205,12 +205,12 @@ inline uint64_t access_page(void *addr, OperationType mode) {
     break;
   case OperationType::WRITE:
     asm volatile("movq %1, (%0)\n\t" // Store value to memory
-                 "mfence\n\t"        // Memory fence to order operations
-                 "clflush (%0)\n\t"  // Flush the cache line
-                 "mfence"            // Ensure flush completes
-                 :
-                 : "r"(page), "r"(value_2)
-                 : "memory");
+      "mfence\n\t"        // Memory fence to order operations
+      "clflush (%0)\n\t"  // Flush the cache line
+      "mfence"            // Ensure flush completes
+      :
+    : "r"(page), "r"(value_2)
+      : "memory");
     break;
   default:
     break;

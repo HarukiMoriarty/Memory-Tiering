@@ -5,23 +5,24 @@
 #include <boost/thread/thread.hpp>
 #include <iostream>
 
-Client::Client(size_t client_id, RingBuffer<ClientMessage> &buffer,
-               size_t running_time, size_t memory_space_size,
-               AccessPattern pattern, double rw_ratio)
-    : buffer_(buffer), client_id_(client_id), running_time_(running_time),
-      generator_(pattern, memory_space_size), rw_ratio_(rw_ratio) {}
+Client::Client(size_t client_id, RingBuffer<ClientMessage>& buffer,
+  size_t running_time, size_t memory_space_size,
+  AccessPattern pattern, double rw_ratio)
+  : buffer_(buffer), client_id_(client_id), running_time_(running_time),
+  generator_(pattern, memory_space_size), rw_ratio_(rw_ratio) {
+}
 
 void Client::run() {
   // Set running duration
   boost::chrono::steady_clock::time_point start_time =
-      boost::chrono::steady_clock::now();
+    boost::chrono::steady_clock::now();
   boost::chrono::seconds total_duration(running_time_);
 
   while (true) {
     boost::chrono::steady_clock::time_point current_time =
-        boost::chrono::steady_clock::now();
+      boost::chrono::steady_clock::now();
     auto elapsed = boost::chrono::duration_cast<boost::chrono::seconds>(
-        current_time - start_time);
+      current_time - start_time);
 
     if (elapsed >= total_duration) {
       break;
@@ -29,7 +30,7 @@ void Client::run() {
 
     // TODO: for now we do not generate offset
     ClientMessage msg(client_id_, generator_.generatePid(), 0,
-                      generator_.generateType(rw_ratio_));
+      generator_.generateType(rw_ratio_));
     while (!buffer_.push(msg)) {
       boost::this_thread::sleep_for(boost::chrono::nanoseconds(100));
     }

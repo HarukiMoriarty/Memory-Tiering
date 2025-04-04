@@ -12,32 +12,32 @@
 class ConfigParser {
 public:
   ConfigParser();
-  bool parse(int argc, char *argv[]);
+  bool parse(int argc, char* argv[]);
 
   // Getters for configuration.
   size_t getBufferSize() const { return buffer_size_; }
   const size_t getRunningTime() const { return running_time_; }
-  const std::vector<ClientConfig> &getClientConfigs() const {
+  const std::vector<ClientConfig>& getClientConfigs() const {
     return client_configs_;
   }
-  const ServerMemoryConfig &getServerMemoryConfig() const {
+  const ServerMemoryConfig& getServerMemoryConfig() const {
     return server_memory_config_;
   }
-  const PolicyConfig &getPolicyConfig() const { return policy_config_; }
-  const std::string &getLatencyOutputFile() const { return cdf_output_file_; }
-  const double &getRwRatio() const { return rw_ratio_; }
-  const size_t &getSampleRate() const { return sample_rate_; }
+  const PolicyConfig& getPolicyConfig() const { return policy_config_; }
+  const std::string& getLatencyOutputFile() const { return cdf_output_file_; }
+  const double& getRwRatio() const { return rw_ratio_; }
+  const size_t& getSampleRate() const { return sample_rate_; }
 
   bool isHelpRequested() const { return help_requested_; }
 
 private:
-  bool _parseBasicConfig(const cxxopts::ParseResult &result);
-  bool _parseServerConfig(const cxxopts::ParseResult &result);
-  bool _parseClientConfigs(const cxxopts::ParseResult &result);
+  bool _parseBasicConfig(const cxxopts::ParseResult& result);
+  bool _parseServerConfig(const cxxopts::ParseResult& result);
+  bool _parseClientConfigs(const cxxopts::ParseResult& result);
   bool _validateMemoryConfiguration();
   void _printConfig() const;
 
-  static std::vector<std::string> _split(const std::string &s, char delim);
+  static std::vector<std::string> _split(const std::string& s, char delim);
   static std::string _getTierName(size_t tier_idx, size_t num_tiers);
 
   cxxopts::Options options_;

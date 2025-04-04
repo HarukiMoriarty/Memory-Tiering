@@ -6,7 +6,7 @@
 #include "RingBuffer.hpp"
 #include "Server.hpp"
 
-int main(int argc, char *argv[]) {
+int main(int argc, char* argv[]) {
   // Initialize components
   Logger::getInstance().init();
   ConfigParser config;
@@ -17,17 +17,17 @@ int main(int argc, char *argv[]) {
 
   // Set up client-server request buffer, get client configurations
   RingBuffer<ClientMessage> clientRequestBuffer(config.getBufferSize());
-  const auto &clientConfigs = config.getClientConfigs();
+  const auto& clientConfigs = config.getClientConfigs();
 
   // Create and initialize server
   ServerMemoryConfig serverConfig = config.getServerMemoryConfig();
   PolicyConfig policyConfig = config.getPolicyConfig();
   Server server(clientRequestBuffer, clientConfigs, &serverConfig,
-                &policyConfig, config.getSampleRate());
+    &policyConfig, config.getSampleRate());
 
   // NOTICE: wait for hot page threshold to expire
-  boost::this_thread::sleep_for(boost::chrono::milliseconds(
-      config.getPolicyConfig().hot_access_interval));
+  boost::this_thread::sleep_for(boost::chrono::seconds(
+    config.getPolicyConfig().scan_interval));
 
   // Create and start clients
   std::vector<std::shared_ptr<Client>> clients;
@@ -40,8 +40,8 @@ int main(int argc, char *argv[]) {
     }
 
     auto client = std::make_shared<Client>(
-        i, clientRequestBuffer, config.getRunningTime(), clientPageSize,
-        clientConfigs[i].pattern, config.getRwRatio());
+      i, clientRequestBuffer, config.getRunningTime(), clientPageSize,
+      clientConfigs[i].pattern, config.getRwRatio());
 
     clients.push_back(client);
     clientThreads.emplace_back([client]() { client->run(); });
@@ -51,16 +51,17 @@ int main(int argc, char *argv[]) {
   boost::thread serverThread(&Server::start, &server);
 
   // Wait for completion
-  for (auto &thread : clientThreads) {
+  for (auto& thread : clientThreads) {
     thread.join();
   }
   serverThread.join();
 
   // Output metrics
-  auto &metrics = Metrics::getInstance();
+  auto& metrics = Metrics::getInstance();
   if (config.getServerMemoryConfig().num_tiers == 3) {
     metrics.printMetricsThreeTiers();
-  } else {
+  }
+  else {
     metrics.printMetricsTwoTiers();
   }
 
