@@ -4,6 +4,13 @@ Scanner::Scanner(PageTable* page_table, PolicyConfig* policy_config)
   : page_table_(page_table), policy_config_(policy_config) {
 }
 
+PageStatus Scanner::classifyPage(uint64_t last_access_time, uint32_t access_count) const
+{
+  if (classifyHotPage(last_access_time, access_count)) return PageStatus::HOT;
+  if (!classifyColdPage(last_access_time, access_count)) return PageStatus::WARM;
+  return PageStatus::COLD;
+}
+
 bool Scanner::classifyHotPage(const uint64_t last_access_time, uint32_t access_count) const
 {
   auto current_time = boost::chrono::steady_clock::now();
@@ -63,22 +70,26 @@ void Scanner::runScanner(size_t num_tiers)
     uint32_t access_cnt;
     std::tie(page_layer, last_access_time, access_cnt) = page_table_->getPageMetaData(page_id);
 
+    PageStatus status = classifyPage(last_access_time, access_cnt);
+
     switch (page_layer)
     {
     case PageLayer::NUMA_LOCAL:
-      if (classifyColdPage(last_access_time, access_cnt))
+      if (status == PageStatus::COLD)
         page_table_->migratePage(page_id, num_tiers == 2 ? PageLayer::PMEM : PageLayer::NUMA_REMOTE);
       break;
 
     case PageLayer::NUMA_REMOTE:
-      if (classifyColdPage(last_access_time, access_cnt))
+      if (status == PageStatus::COLD)
         page_table_->migratePage(page_id, PageLayer::PMEM);
       else if (classifyHotPage(last_access_time, access_cnt))
         page_table_->migratePage(page_id, PageLayer::NUMA_LOCAL);
       break;
 
     case PageLayer::PMEM:
-      if (classifyHotPage(last_access_time, access_cnt))
+      if (status == PageStatus::HOT)
+        page_table_->migratePage(page_id, PageLayer::NUMA_LOCAL);
+      else if (status == PageStatus::WARM)
         page_table_->migratePage(page_id, num_tiers == 2 ? PageLayer::NUMA_LOCAL : PageLayer::NUMA_REMOTE);
       break;
     }
@@ -92,7 +103,7 @@ void Scanner::runScanner(size_t num_tiers)
       LOG_INFO("finished scanning all pages in one round at " << scan_duration << " seconds");
 
       boost::this_thread::sleep_for(
-        boost::chrono::seconds(std::get<LRUPolicyConfig>(policy_config_->config).hot_threshold_ms / 1000));
+        boost::chrono::seconds(policy_config_->scan_interval));
     }
   }
 }

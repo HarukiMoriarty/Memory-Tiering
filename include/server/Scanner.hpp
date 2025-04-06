@@ -13,6 +13,12 @@
 
 class Server;
 
+enum class PageStatus {
+  HOT,
+  WARM,
+  COLD
+};
+
 class Scanner {
 private:
   PageTable* page_table_;
@@ -23,15 +29,18 @@ private:
 
   bool _shouldShutdown();
 
-public:
-  // Constructor
-  Scanner(PageTable* page_table, PolicyConfig* policy_config);
-
   // Check if a single page is hot
   bool classifyHotPage(const uint64_t last_access_time, uint32_t access_count) const;
 
   // Check if a single page is cold
   bool classifyColdPage(const uint64_t last_access_time, uint32_t access_count) const;
+
+public:
+  // Constructor
+  Scanner(PageTable* page_table, PolicyConfig* policy_config);
+
+  // Check page status HOT / WARM / COLD
+  PageStatus classifyPage(uint64_t last_access_time, uint32_t access_count) const;
 
   // Continuously classify pages
   void runScanner(size_t num_tiers);
