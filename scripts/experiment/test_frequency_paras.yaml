@@ -1,0 +1,23 @@
+pattern: ["zipfian"]
+
+client_tier_sizes: [
+  "262144 1048576 2097152",
+  "131072 524288 1048576"
+]
+
+buffer_size: [1000]
+running_time: [600]
+
+server_mem_sizes: [
+  "262144,1048576,4194304"
+]
+
+policy_type: ["frequency"]
+
+# Frequency & Hybrid counts
+hot_count: [20, 50]
+cold_count: [1, 2, 4, 8, 10, 20]
+
+num_tiers: [3]
+scan_interval: [60]
+sample_rate: [5]

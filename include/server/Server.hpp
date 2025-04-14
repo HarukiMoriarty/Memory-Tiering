@@ -21,7 +21,7 @@ public:
   Server(RingBuffer<ClientMessage>& client_buffer,
     const std::vector<ClientConfig>& client_configs,
     ServerMemoryConfig* server_config, PolicyConfig* policy_config,
-    size_t sample_rate);
+    size_t sample_rate, const std::string periodic_metric_filename);
   ~Server();
 
   void handleClientMessage(const ClientMessage& msg);
@@ -45,8 +45,9 @@ private:
   size_t sample_rate_;
 
   ServerMemoryConfig* server_config_;
-  PolicyConfig* policy_config_;
   std::vector<bool> client_done_flags_;
+
+  std::string periodic_metric_filename_;
 
   // Base page id for each memory layer
   std::vector<size_t> base_page_id_;

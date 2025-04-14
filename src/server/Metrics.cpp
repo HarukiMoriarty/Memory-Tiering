@@ -123,7 +123,7 @@ void Metrics::reset()
                                         probabilities };
 }
 
-void Metrics::periodicalMetrics(ServerMemoryConfig* server_config)
+void Metrics::periodicalMetrics(ServerMemoryConfig* server_config, const std::string& periodic_metric_filename)
 {
   // Store current counter values to ensure consistency
   uint64_t total_latency_now = total_latency_.load();
@@ -163,7 +163,7 @@ void Metrics::periodicalMetrics(ServerMemoryConfig* server_config)
 
   // Output metrics to file
   std::ofstream out_file;
-  out_file.open("result/periodic_metrics.csv", std::ios_base::app);
+  out_file.open(periodic_metric_filename, std::ios_base::app);
 
   if (!out_file.is_open())
   {

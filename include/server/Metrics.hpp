@@ -52,7 +52,7 @@ public:
   }
 
   // Periodically latency calculation
-  void periodicalMetrics(ServerMemoryConfig* server_config);
+  void periodicalMetrics(ServerMemoryConfig* server_config, const std::string& periodic_metric_filename);
 
   // Print current metrics (call periodically or at program end)
   void printMetricsThreeTiers() const;

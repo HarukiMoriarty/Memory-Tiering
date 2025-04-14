@@ -24,6 +24,7 @@ ConfigParser::ConfigParser()
     ("c,client-tier-sizes", "Memory space size per tier per client (client1_local,client1_remote,client1_pmem ...)", cxxopts::value<std::vector<std::string>>())
     ("running-time", "Running time in seconds per client", cxxopts::value<size_t>())
     ("o,output", "Output file for access latency CDF data", cxxopts::value<std::string>()->default_value("result/latency.csv"))
+    ("periodic-output", "Output file for periodical metrics", cxxopts::value<std::string>()->default_value("result/periodic_metrics.csv"))
     ("p,patterns", "Memory access patterns for each client (uniform/hot/zipfian)", cxxopts::value<std::vector<std::string>>())
     ("r,ratio", "Memory access read/write ratio", cxxopts::value<double>()->default_value("1.0"))
     ("s,mem-sizes", "Memory size in pages for each tier", cxxopts::value<std::vector<size_t>>())
@@ -36,6 +37,7 @@ ConfigParser::ConfigParser()
     ("cold-count", "Cold access count for frequency/hybrid", cxxopts::value<size_t>()->default_value("2"))
     ("recency-weight", "Recency weight for hybrid", cxxopts::value<double>()->default_value("0.5"))
     ("frequency-weight", "Frequency weight for hybrid", cxxopts::value<double>()->default_value("0.5"))
+    ("scan-interval", "Page table scan interval (in seconds)", cxxopts::value<size_t>()->default_value("30"))
     ("h,help", "Print usage information");
 }
 
@@ -44,6 +46,7 @@ bool ConfigParser::_parseBasicConfig(const cxxopts::ParseResult& result)
   buffer_size_ = result["buffer-size"].as<size_t>();
   running_time_ = result["running-time"].as<size_t>();
   cdf_output_file_ = result["output"].as<std::string>();
+  periodic_metric_output_file_ = result["periodic-output"].as<std::string>();
   rw_ratio_ = result["ratio"].as<double>();
   sample_rate_ = result["sample-rate"].as<size_t>();
 
@@ -56,6 +59,7 @@ bool ConfigParser::_parseBasicConfig(const cxxopts::ParseResult& result)
 
   std::string policy_type = result["policy-type"].as<std::string>();
   policy_config_.policy_type = policy_type;
+  policy_config_.scan_interval = result["scan-interval"].as<size_t>();
 
   if (policy_type == "lru")
   {
@@ -207,6 +211,7 @@ void ConfigParser::_printConfig() const {
   LOG_INFO("Sample Rate: " << sample_rate_);
 
   LOG_INFO("Migration Page Policy Type: " << policy_config_.policy_type);
+  LOG_INFO("Scan Interval: " << policy_config_.scan_interval);
 
   if (policy_config_.policy_type == "lru") {
     auto& lru = std::get<LRUPolicyConfig>(policy_config_.config);
@@ -230,6 +235,7 @@ void ConfigParser::_printConfig() const {
 
   LOG_INFO("Number of Tiers: " << server_memory_config_.num_tiers);
   LOG_INFO("CDF Output File: " << cdf_output_file_);
+  LOG_INFO("Periodic Metric Output File: " << periodic_metric_output_file_);
 
   LOG_INFO("Memory Tier Sizes:");
   for (size_t i = 0; i < server_memory_config_.num_tiers; i++) {

@@ -3,9 +3,10 @@
 Server::Server(RingBuffer<ClientMessage>& client_buffer,
   const std::vector<ClientConfig>& client_configs,
   ServerMemoryConfig* server_config, PolicyConfig* policy_config,
-  size_t sample_rate)
+  size_t sample_rate, const std::string periodic_metric_filename)
   : client_buffer_(client_buffer), sample_rate_(sample_rate),
-  server_config_(server_config), policy_config_(policy_config) {
+  server_config_(server_config),
+  periodic_metric_filename_(periodic_metric_filename) {
   // Calculate load memory pages
   size_t client_total_page = 0;
   if (server_config_->num_tiers == 2) {
@@ -88,7 +89,7 @@ void Server::_runPeriodicalMetricsThread() {
   Metrics& metrics = Metrics::getInstance();
   while (!_shouldShutdown()) {
     boost::this_thread::sleep_for(boost::chrono::seconds(sample_rate_));
-    metrics.periodicalMetrics(server_config_);
+    metrics.periodicalMetrics(server_config_, periodic_metric_filename_);
   }
   LOG_DEBUG("Policy thread exiting...");
 }
@@ -110,7 +111,6 @@ void Server::start() {
   boost::thread policy_thread(&Server::_runScannerThread, this);
   boost::thread periodical_metric_thread(&Server::_runPeriodicalMetricsThread,
     this);
-
   // Join threads
   server_thread.join();
   policy_thread.join();

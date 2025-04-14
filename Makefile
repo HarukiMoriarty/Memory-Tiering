@@ -1,4 +1,4 @@
-CXX = g++
+CXX = clang++
 CXXFLAGS = -Wall -std=c++17 -pthread -DBOOST_LOG_DYN_LINK -O3
 INCLUDES = -Iinclude \
           -Iinclude/client \
@@ -31,9 +31,15 @@ TARGET = $(BUILD_DIR)/main
 # Check for required libraries
 REQUIRED_LIBS = cxxopts
 
+JOBS ?= $(shell nproc)
+
 .PHONY: all clean directories check-libs
 
-all: clean check-libs directories $(TARGET)
+all:
+	@$(MAKE) -j1 clean
+	@$(MAKE) check-libs
+	@$(MAKE) directories
+	@$(MAKE) -j$(JOBS) $(TARGET)
 
 check-libs:
 	@for lib in $(REQUIRED_LIBS); do \

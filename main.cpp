@@ -23,7 +23,7 @@ int main(int argc, char* argv[]) {
   ServerMemoryConfig serverConfig = config.getServerMemoryConfig();
   PolicyConfig policyConfig = config.getPolicyConfig();
   Server server(clientRequestBuffer, clientConfigs, &serverConfig,
-    &policyConfig, config.getSampleRate());
+    &policyConfig, config.getSampleRate(), config.getPeriodicMetricFile());
 
   // NOTICE: wait for hot page threshold to expire
   boost::this_thread::sleep_for(boost::chrono::seconds(

@@ -1,0 +1,30 @@
+pattern: ["zipfian", "uniform", "hot"]
+
+client_tier_sizes: [
+  "262144 1048576 2097152",
+]
+
+buffer_size: [1000]
+running_time: [1200]
+
+server_mem_sizes: [
+  "262144,1048576,4194304"
+]
+
+policy_type: ["lru", "frequency", "hybrid"]
+
+# LRU & Hybrid thresholds
+hot_threshold: [1000]
+cold_threshold: [10000]
+
+# Frequency & Hybrid counts
+hot_count: [20]
+cold_count: [10]
+
+# Hybrid weights
+recency_weight: [0.5]
+frequency_weight: [0.5]
+
+num_tiers: [3]
+scan_interval: [60]
+sample_rate: [5]

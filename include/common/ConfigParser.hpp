@@ -25,6 +25,7 @@ public:
   }
   const PolicyConfig& getPolicyConfig() const { return policy_config_; }
   const std::string& getLatencyOutputFile() const { return cdf_output_file_; }
+  const std::string& getPeriodicMetricFile() const { return periodic_metric_output_file_; }
   const double& getRwRatio() const { return rw_ratio_; }
   const size_t& getSampleRate() const { return sample_rate_; }
 
@@ -53,6 +54,7 @@ private:
   PolicyConfig policy_config_;
 
   std::string cdf_output_file_;
+  std::string periodic_metric_output_file_;
 };
 
 #endif // CONFIGPARSER_H

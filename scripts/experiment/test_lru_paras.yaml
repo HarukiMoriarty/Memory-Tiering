@@ -1,0 +1,23 @@
+pattern: ["zipfian"]
+
+client_tier_sizes: [
+  "262144 1048576 2097152",
+  "131072 524288 1048576"
+]
+
+buffer_size: [1000]
+running_time: [600]
+
+server_mem_sizes: [
+  "262144,1048576,4194304"
+]
+
+policy_type: ["lru"]
+
+# LRU & Hybrid thresholds
+hot_threshold: [100, 250, 500, 1000, 1500, 3000]
+cold_threshold: [500, 1000, 1500, 3000, 5000, 10000]
+
+num_tiers: [3]
+scan_interval: [60]
+sample_rate: [5]
