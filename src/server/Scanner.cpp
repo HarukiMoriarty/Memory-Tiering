@@ -96,12 +96,15 @@ void Scanner::runScanner(size_t num_tiers)
 
     if (page_id == page_table_->size() - 1)
     {
-      page_table_->promoteToHugePage();
 
       auto scan_end_time = boost::chrono::steady_clock::now();
       auto scan_duration = boost::chrono::duration_cast<boost::chrono::seconds>(scan_end_time - scan_start_time).count();
       LOG_INFO("finished scanning all pages in one round at " << scan_duration << " seconds");
 
+      page_table_->promoteToHugePage();
+      auto promotion_end_time = boost::chrono::steady_clock::now();
+      auto promotion_duration = boost::chrono::duration_cast<boost::chrono::seconds>(promotion_end_time - scan_end_time).count();
+      LOG_INFO("finished promotion pages at " << promotion_duration << " seconds");
       boost::this_thread::sleep_for(
         boost::chrono::seconds(policy_config_->scan_interval));
     }

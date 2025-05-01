@@ -52,7 +52,7 @@ public:
   }
 
   // Periodically latency calculation
-  void periodicalMetrics(ServerMemoryConfig* server_config, const std::string& periodic_metric_filename);
+  void periodicalMetrics(ServerMemoryConfig* server_config, int_least64_t interval, const std::string& periodic_metric_filename);
 
   // Print current metrics (call periodically or at program end)
   void printMetricsThreeTiers() const;
@@ -96,6 +96,13 @@ private:
   uint64_t last_period_remote_access_count_{ 0 };
   uint64_t last_period_pmem_access_count_{ 0 };
   uint64_t last_period_latency_{ 0 };
+
+  uint64_t last_period_local_to_remote_count_{ 0 };
+  uint64_t last_period_remote_to_local_count_{ 0 };
+  uint64_t last_period_pmem_to_remote_count_{ 0 };
+  uint64_t last_period_remote_to_pmem_count_{ 0 };
+  uint64_t last_period_local_to_pmem_count_{ 0 };
+  uint64_t last_period_pmem_to_local_count_{ 0 };
 };
 
 #endif

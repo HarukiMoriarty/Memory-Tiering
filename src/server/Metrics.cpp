@@ -123,13 +123,20 @@ void Metrics::reset()
                                         probabilities };
 }
 
-void Metrics::periodicalMetrics(ServerMemoryConfig* server_config, const std::string& periodic_metric_filename)
+void Metrics::periodicalMetrics(ServerMemoryConfig* server_config, int_least64_t interval, const std::string& periodic_metric_filename)
 {
   // Store current counter values to ensure consistency
   uint64_t total_latency_now = total_latency_.load();
   uint64_t local_access_count_now = local_access_count_.load();
   uint64_t remote_access_count_now = remote_access_count_.load();
   uint64_t pmem_access_count_now = pmem_access_count_.load();
+
+  uint64_t local_to_remote_count_now = local_to_remote_count_.load();
+  uint64_t remote_to_local_count_now = remote_to_local_count_.load();
+  uint64_t pmem_to_remote_count_now = pmem_to_remote_count_.load();
+  uint64_t remote_to_pmem_count_now = remote_to_pmem_count_.load();
+  uint64_t local_to_pmem_count_now = local_to_pmem_count_.load();
+  uint64_t pmem_to_local_count_now = pmem_to_local_count_.load();
 
   // Calculate deltas since last period
   uint64_t current_latency = total_latency_now - last_period_latency_;
@@ -143,6 +150,13 @@ void Metrics::periodicalMetrics(ServerMemoryConfig* server_config, const std::st
   uint64_t current_access = current_local_access_count +
     current_remote_access_count +
     current_pmem_access_count;
+
+  uint64_t current_local_to_remote_count = local_to_remote_count_now - last_period_local_to_remote_count_;
+  uint64_t current_remote_to_local_count = remote_to_local_count_now - last_period_remote_to_local_count_;
+  uint64_t current_pmem_to_remote_count = pmem_to_remote_count_now - last_period_pmem_to_remote_count_;
+  uint64_t current_remote_to_pmem_count = remote_to_pmem_count_now - last_period_remote_to_pmem_count_;
+  uint64_t current_local_to_pmem_count = local_to_pmem_count_now - last_period_local_to_pmem_count_;
+  uint64_t current_pmem_to_local_count = pmem_to_local_count_now - last_period_pmem_to_local_count_;
 
   // Calculate throughput
   double throughput = 0.0;
@@ -161,6 +175,13 @@ void Metrics::periodicalMetrics(ServerMemoryConfig* server_config, const std::st
   last_period_remote_access_count_ = remote_access_count_now;
   last_period_pmem_access_count_ = pmem_access_count_now;
 
+  last_period_local_to_remote_count_ = local_to_remote_count_now;
+  last_period_remote_to_local_count_ = remote_to_local_count_now;
+  last_period_pmem_to_remote_count_ = pmem_to_remote_count_now;
+  last_period_remote_to_pmem_count_ = remote_to_pmem_count_now;
+  last_period_local_to_pmem_count_ = local_to_pmem_count_now;
+  last_period_pmem_to_local_count_ = pmem_to_local_count_now;
+
   // Output metrics to file
   std::ofstream out_file;
   out_file.open(periodic_metric_filename, std::ios_base::app);
@@ -178,7 +199,8 @@ void Metrics::periodicalMetrics(ServerMemoryConfig* server_config, const std::st
   {
     out_file << "Latency(ns),Throughput(ops/"
       "s),LocalAccess,RemoteAccess,PmemAccess,TotalAccess,"
-      "LocalCount,RemoteCount,PmemCount"
+      "local2remote,remote2local,remote2pmem,pmem2remote,local2pmem,pmem2local,"
+      "LocalCount,RemoteCount,PmemCount,Interval"
       << std::endl;
   }
 
@@ -186,9 +208,16 @@ void Metrics::periodicalMetrics(ServerMemoryConfig* server_config, const std::st
   out_file << avg_latency << "," << throughput << ","
     << current_local_access_count << "," << current_remote_access_count
     << "," << current_pmem_access_count << "," << current_access << ","
+    << current_local_to_remote_count << ","
+    << current_remote_to_local_count << ","
+    << current_remote_to_pmem_count << ","
+    << current_pmem_to_remote_count << ","
+    << current_local_to_pmem_count << ","
+    << current_pmem_to_local_count << ","
     << server_config->local_numa.count << ","
     << server_config->remote_numa.count << ","
-    << server_config->pmem.count << std::endl;
+    << server_config->pmem.count << ","
+    << interval << std::endl;
 
   out_file.close();
 }

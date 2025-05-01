@@ -86,10 +86,13 @@ void Server::_runScannerThread() {
 
 void Server::_runPeriodicalMetricsThread() {
   LOG_INFO("Periodical metric thread start!");
+  auto metric_start_time = boost::chrono::steady_clock::now();
   Metrics& metrics = Metrics::getInstance();
   while (!_shouldShutdown()) {
     boost::this_thread::sleep_for(boost::chrono::seconds(sample_rate_));
-    metrics.periodicalMetrics(server_config_, periodic_metric_filename_);
+    auto metric_end_time = boost::chrono::steady_clock::now();
+    auto metric_duration = boost::chrono::duration_cast<boost::chrono::seconds>(metric_end_time - metric_start_time).count();
+    metrics.periodicalMetrics(server_config_, metric_duration, periodic_metric_filename_);
   }
   LOG_DEBUG("Policy thread exiting...");
 }
