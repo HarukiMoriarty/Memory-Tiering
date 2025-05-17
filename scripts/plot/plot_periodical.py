@@ -37,7 +37,7 @@ def plot_metrics(filename, time_interval=10):
     plt.grid(True, linestyle='--', alpha=0.7)
     plt.xticks(x_ticks)
     plt.tight_layout()
-    output_file = f'fig/{base_name}_latency.jpg'
+    output_file = f'fig/{base_name}_latency.pdf'
     plt.savefig(output_file, dpi=300, bbox_inches='tight')
     print(f"Latency figure saved as: {output_file}")
     plt.close()
@@ -52,7 +52,7 @@ def plot_metrics(filename, time_interval=10):
     plt.grid(True, linestyle='--', alpha=0.7)
     plt.xticks(x_ticks)
     plt.tight_layout()
-    output_file = f'fig/{base_name}_throughput.jpg'
+    output_file = f'fig/{base_name}_throughput.pdf'
     plt.savefig(output_file, dpi=300, bbox_inches='tight')
     print(f"Throughput figure saved as: {output_file}")
     plt.close()
@@ -74,7 +74,7 @@ def plot_metrics(filename, time_interval=10):
     plt.grid(True, linestyle='--', alpha=0.7)
     plt.xticks(x_ticks)
     plt.tight_layout()
-    output_file = f'fig/{base_name}_access_types.jpg'
+    output_file = f'fig/{base_name}_access_types.pdf'
     plt.savefig(output_file, dpi=300, bbox_inches='tight')
     print(f"Access Types figure saved as: {output_file}")
     plt.close()
@@ -94,7 +94,7 @@ def plot_metrics(filename, time_interval=10):
     plt.grid(True, linestyle='--', alpha=0.7)
     plt.xticks(x_ticks)
     plt.tight_layout()
-    output_file = f'fig/{base_name}_count_types.jpg'
+    output_file = f'fig/{base_name}_count_types.pdf'
     plt.savefig(output_file, dpi=300, bbox_inches='tight')
     print(f"Count Types figure saved as: {output_file}")
     plt.close()
@@ -138,7 +138,7 @@ def plot_metrics(filename, time_interval=10):
     axs[2].set_xticks(x_ticks)
 
     plt.tight_layout()
-    output_file = f'fig/{base_name}_transfer_types.jpg'
+    output_file = f'fig/{base_name}_transfer_types.pdf'
     plt.savefig(output_file, dpi=300, bbox_inches='tight')
     print(f"Transfer Types figure saved as: {output_file}")
     plt.close()

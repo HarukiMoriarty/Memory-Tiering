@@ -1,7 +1,8 @@
-pattern: ["zipfian", "uniform", "hot"]
+pattern: ["hot", "uniform", "zipfian"]
 
 client_tier_sizes: [
   "262144 1048576 2097152",
+  "131072 524288 1048576"
 ]
 
 buffer_size: [1000]
@@ -11,7 +12,7 @@ server_mem_sizes: [
   "262144,1048576,4194304"
 ]
 
-policy_type: ["lru", "frequency", "hybrid"]
+policy_type: ["lru", "frequency"]
 
 # LRU & Hybrid thresholds
 hot_threshold: [1000]
