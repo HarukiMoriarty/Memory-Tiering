@@ -1,7 +1,7 @@
 #include "Generator.hpp"
 
 MemoryAccessGenerator::MemoryAccessGenerator(AccessPattern pattern,
-  size_t memory_space_size)
+  size_t memory_space_size, double zipf_s)
   : pattern_(pattern), memory_space_size_(memory_space_size) {
   std::random_device rd;
   rng_ = std::mt19937(rd());
@@ -29,16 +29,10 @@ MemoryAccessGenerator::MemoryAccessGenerator(AccessPattern pattern,
   else if (pattern == AccessPattern::ZIPFIAN) {
     zipf_prob_.resize(memory_space_size_);
 
-    double sum = 0.0;
     for (size_t i = 1; i <= memory_space_size_; i++) {
-      zipf_prob_[i - 1] = 1.0 / std::pow(i, 1);
-      sum += zipf_prob_[i - 1];
+      zipf_prob_[i - 1] = 1.0 / std::pow(i, zipf_s);
     }
 
-    // Normalize probabilities
-    for (size_t i = 0; i < memory_space_size_; i++) {
-      zipf_prob_[i] /= sum;
-    }
     std::shuffle(zipf_prob_.begin(), zipf_prob_.end(), rng_);
 
     zipf_dist_ = std::discrete_distribution<size_t>(zipf_prob_.begin(),

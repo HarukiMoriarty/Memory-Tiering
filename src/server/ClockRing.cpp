@@ -35,7 +35,7 @@ bool ClockRing::insert(size_t page_id, ClockRingNode*& out_ptr) {
 }
 
 void ClockRing::remove(ClockRingNode*& node_ptr) {
-    if (!node_ptr) return;
+    assert(!node_ptr && "Cannot remove nullptr");
 
     if (node_ptr->next == node_ptr) {
         hand_ = nullptr;

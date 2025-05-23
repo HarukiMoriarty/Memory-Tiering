@@ -8,6 +8,7 @@
 #include <tuple>
 #include <vector>
 
+#include "ClockRing.hpp"
 #include "Common.hpp"
 #include "Logger.hpp"
 #include "Metrics.hpp"
@@ -20,8 +21,10 @@ struct PageMetadata
   std::atomic<PageLayer> page_layer;
   std::atomic<uint64_t> last_access_time_ms;
   std::atomic<uint32_t> access_cnt;
+  std::atomic<ClockRingNode*> ring_node_ptr;
 
-  PageMetadata(PageLayer layer = PageLayer::NUMA_LOCAL) : page_layer(layer)
+  PageMetadata(PageLayer layer = PageLayer::NUMA_LOCAL)
+    : page_layer(layer), ring_node_ptr(nullptr)
   {
     auto now = boost::chrono::steady_clock::now();
     auto duration = now.time_since_epoch();
@@ -46,7 +49,7 @@ class PageTable
 {
 public:
   PageTable(const std::vector<ClientConfig>& client_configs,
-    ServerMemoryConfig* server_config);
+    ServerMemoryConfig* server_config, bool enable_cache_ring);
   ~PageTable();
 
   void initPageTable();
@@ -81,6 +84,9 @@ private:
   size_t pmem_page_load_ = 0;
 
   size_t scan_index_ = 0;
+
+  bool enable_cache_ring_ = false;
+  std::unique_ptr<ClockRing> local_cache_ring_ = nullptr;
 };
 
 #endif // PAGETABLE_H

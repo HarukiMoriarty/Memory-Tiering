@@ -25,7 +25,7 @@ Server::Server(RingBuffer<ClientMessage>& client_buffer,
     }
   }
 
-  page_table_ = new PageTable(client_configs, server_config);
+  page_table_ = new PageTable(client_configs, server_config, false);
   page_table_->initPageTable();
 
   scanner_ = new Scanner(page_table_, policy_config);

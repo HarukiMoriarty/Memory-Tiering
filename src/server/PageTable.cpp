@@ -1,8 +1,9 @@
 #include "PageTable.hpp"
 
 PageTable::PageTable(const std::vector<ClientConfig>& client_configs,
-  ServerMemoryConfig* server_config)
-  : client_configs_(client_configs), server_config_(server_config)
+  ServerMemoryConfig* server_config, bool enable_cache_ring)
+  : client_configs_(client_configs), server_config_(server_config),
+  enable_cache_ring_(enable_cache_ring)
 {
   if (server_config_->num_tiers == 2)
   {
@@ -20,6 +21,10 @@ PageTable::PageTable(const std::vector<ClientConfig>& client_configs,
       remote_page_load_ += client.tier_sizes[1];
       pmem_page_load_ += client.tier_sizes[2];
     }
+  }
+
+  if (enable_cache_ring_) {
+    local_cache_ring_ = std::make_unique<ClockRing>(local_page_load_);
   }
 }
 
@@ -63,11 +68,19 @@ void PageTable::initPageTable()
           std::forward_as_tuple(current_index),
           std::forward_as_tuple(static_cast<void*>(addr), layer));
 
+        // If ring is enabled and this is a NUMA_LOCAL page, insert into the ring
+        if (enable_cache_ring_ && layer == PageLayer::NUMA_LOCAL)
+        {
+          auto& page_meta = table_[current_index].metadata;
+          ClockRingNode* node = nullptr;
+          assert(local_cache_ring_->insert(current_index, node) && "Insert into cache ring fail");
+          page_meta.ring_node_ptr.store(node, std::memory_order_relaxed);
+        }
+
         current_index++;
         offset++;
       }
-      LOG_DEBUG("Filled " << count << " pages for layer "
-        << static_cast<int>(layer));
+      LOG_DEBUG("Filled " << count << " pages for layer " << static_cast<int>(layer));
     };
 
   for (ClientConfig client : client_configs_)
@@ -137,6 +150,11 @@ void PageTable::accessPage(size_t page_id, OperationType mode)
 
   uint64_t access_time = access_page(it->second.page_address, mode);
   PageMetadata& page_meta_data = it->second.metadata;
+
+  if (enable_cache_ring_ && page_meta_data.page_layer == PageLayer::NUMA_LOCAL) {
+    ClockRing::markAccessed(page_meta_data.ring_node_ptr.load(std::memory_order_relaxed));
+  }
+
   auto now = boost::chrono::steady_clock::now();
   auto duration = now.time_since_epoch();
   auto ms = boost::chrono::duration_cast<boost::chrono::milliseconds>(duration)
@@ -193,6 +211,10 @@ void PageTable::migratePage(size_t page_index, PageLayer page_target_layer)
   {
   case PageLayer::NUMA_LOCAL:
     current_layer_info = &server_config_->local_numa;
+    if (enable_cache_ring_) {
+      ClockRingNode* node = page_meta_data.ring_node_ptr.exchange(nullptr);
+      local_cache_ring_->remove(node);
+    }
     break;
   case PageLayer::NUMA_REMOTE:
     current_layer_info = &server_config_->remote_numa;
@@ -203,7 +225,21 @@ void PageTable::migratePage(size_t page_index, PageLayer page_target_layer)
   }
 
   // Check capacity
-  if (target_layer_info->isFull())
+  if (page_target_layer == PageLayer::NUMA_LOCAL && enable_cache_ring_)
+  {
+    if (target_layer_info->isFull()) {
+      // Evict a page from NUMA_LOCAL to NUMA_REMOTE
+      size_t evict_id = local_cache_ring_->findEvictionCandidate();
+      // We have possible that NUMA_REMMOTE is full
+      if (server_config_->remote_numa.isFull()) {
+        migratePage(evict_id, PageLayer::PMEM);
+      }
+      else {
+        migratePage(evict_id, PageLayer::NUMA_REMOTE);
+      }
+    }
+  }
+  else if (target_layer_info->isFull())
   {
     LOG_DEBUG(target_layer_info->count << " " << target_layer_info->capacity);
     LOG_DEBUG(page_target_layer << " is full, page mitigate is failed");
@@ -216,6 +252,13 @@ void PageTable::migratePage(size_t page_index, PageLayer page_target_layer)
   migrate_page(it->second.page_address, page_current_layer, page_target_layer);
   // Maintain metadata
   page_meta_data.page_layer = page_target_layer;
+
+  if (enable_cache_ring_ && page_target_layer == PageLayer::NUMA_LOCAL) {
+    ClockRingNode* node = nullptr;
+    assert(local_cache_ring_->insert(page_index, node));
+    page_meta_data.ring_node_ptr.store(node, std::memory_order_relaxed);
+  }
+
   auto now = boost::chrono::steady_clock::now();
   auto duration = now.time_since_epoch();
   auto ms = boost::chrono::duration_cast<boost::chrono::milliseconds>(duration)

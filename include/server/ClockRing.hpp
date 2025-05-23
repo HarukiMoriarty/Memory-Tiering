@@ -11,7 +11,7 @@ struct ClockRingNode {
     ClockRingNode* prev;
     ClockRingNode* next;
 
-    ClockRingNode(size_t pid) : page_id(pid), ref_bit(true), prev(nullptr), next(nullptr) {}
+    ClockRingNode(size_t pid) : page_id(pid), ref_bit(false), prev(nullptr), next(nullptr) {}
 };
 
 class ClockRing {

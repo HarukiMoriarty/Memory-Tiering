@@ -33,7 +33,7 @@ public:
   /**
    * Constructor for memory access pattern generator
    */
-  MemoryAccessGenerator(AccessPattern pattern, size_t memory_space_size);
+  MemoryAccessGenerator(AccessPattern pattern, size_t memory_space_size, double zipf_s = 1.0);
 
   /**
    * Generates a page identifier according to the specified access pattern
