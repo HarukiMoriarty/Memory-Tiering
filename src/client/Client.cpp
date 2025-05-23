@@ -35,7 +35,7 @@ void Client::run() {
       boost::this_thread::sleep_for(boost::chrono::nanoseconds(100));
     }
 
-    LOG_DEBUG("client " << client_id_ << "sent: " << msg.toString());
+    LOG_DEBUG("client " << client_id_ << " sent: " << msg.toString());
   }
 
   // Send last message to notify server
@@ -43,5 +43,5 @@ void Client::run() {
   while (!buffer_.push(end_msg)) {
     boost::this_thread::sleep_for(boost::chrono::nanoseconds(100));
   }
-  LOG_DEBUG("client " << client_id_ << "sent: END");
+  LOG_DEBUG("client " << client_id_ << " sent: END");
 }

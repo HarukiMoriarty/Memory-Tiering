@@ -49,6 +49,7 @@ def run_experiment(params: Dict[str, Any], exp_name: str):
         f"scan{params['scan_interval']}",
         f"sample{params['sample_rate']}",
         params["policy_type"],
+        f"cache_ring_{params['cache_ring']}",
     ]
 
     # Add policy-specific identifiers
@@ -108,6 +109,12 @@ def run_experiment(params: Dict[str, Any], exp_name: str):
             "--recency-weight", str(params["recency_weight"]),
             "--frequency-weight", str(params["frequency_weight"])
         ]
+
+    if "zipfs" in params:
+        cmd += ["--zipfs", str(params["zipfs"])]
+
+    if "cache_ring" in params and params["cache_ring"]:
+        cmd += ["--cache-ring"]
 
     LOG.info(f"Running command: {' '.join(cmd)}")
     subprocess.run(cmd, check=True)

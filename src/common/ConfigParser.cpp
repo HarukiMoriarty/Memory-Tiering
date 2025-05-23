@@ -249,6 +249,7 @@ void ConfigParser::_printConfig() const {
     LOG_INFO("  - " << _getTierName(i, server_memory_config_.num_tiers) << ": "
       << *sizes[i] << " pages");
   }
+  LOG_INFO("  - Cache Ring: ") << use_cache_ring_;
 
   LOG_INFO("Client Configurations:");
   for (size_t i = 0; i < client_configs_.size(); i++) {
@@ -257,6 +258,9 @@ void ConfigParser::_printConfig() const {
       << (client_configs_[i].pattern == AccessPattern::UNIFORM
         ? "Uniform"
         : (client_configs_[i].pattern == AccessPattern::HOT ? "Hot" : "Zipfian")));
+    if (client_configs_[i].pattern == AccessPattern::ZIPFIAN) {
+      LOG_INFO("    - Zipfs: " << client_configs_[i].zipf_s);
+    }
     for (size_t j = 0; j < client_configs_[i].tier_sizes.size(); j++) {
       LOG_INFO("    - " << _getTierName(j, server_memory_config_.num_tiers)
         << ": " << client_configs_[i].tier_sizes[j] << " pages");

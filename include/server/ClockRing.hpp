@@ -5,6 +5,8 @@
 #include <atomic>
 #include <cassert>
 
+#include "common/Logger.hpp"
+
 struct ClockRingNode {
     size_t page_id;
     std::atomic<bool> ref_bit;

@@ -1,7 +1,8 @@
-pattern: ["hot", "uniform", "zipfian"]
+pattern: ["zipfian"]
+zipfs: [1.0]
+cache_ring: [true]
 
 client_tier_sizes: [
-  "262144 1048576 2097152",
   "131072 524288 1048576"
 ]
 
