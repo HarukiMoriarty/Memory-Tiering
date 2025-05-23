@@ -21,7 +21,7 @@ public:
   Server(RingBuffer<ClientMessage>& client_buffer,
     const std::vector<ClientConfig>& client_configs,
     ServerMemoryConfig* server_config, PolicyConfig* policy_config,
-    size_t sample_rate, const std::string periodic_metric_filename);
+    bool use_cache_ring, size_t sample_rate, const std::string periodic_metric_filename);
   ~Server();
 
   void handleClientMessage(const ClientMessage& msg);

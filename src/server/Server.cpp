@@ -3,7 +3,7 @@
 Server::Server(RingBuffer<ClientMessage>& client_buffer,
   const std::vector<ClientConfig>& client_configs,
   ServerMemoryConfig* server_config, PolicyConfig* policy_config,
-  size_t sample_rate, const std::string periodic_metric_filename)
+  bool use_cache_ring, size_t sample_rate, const std::string periodic_metric_filename)
   : client_buffer_(client_buffer), sample_rate_(sample_rate),
   server_config_(server_config),
   periodic_metric_filename_(periodic_metric_filename) {
@@ -25,7 +25,7 @@ Server::Server(RingBuffer<ClientMessage>& client_buffer,
     }
   }
 
-  page_table_ = new PageTable(client_configs, server_config, false);
+  page_table_ = new PageTable(client_configs, server_config, use_cache_ring);
   page_table_->initPageTable();
 
   scanner_ = new Scanner(page_table_, policy_config);

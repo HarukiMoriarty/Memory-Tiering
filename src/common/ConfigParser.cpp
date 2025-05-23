@@ -26,6 +26,8 @@ ConfigParser::ConfigParser()
     ("o,output", "Output file for access latency CDF data", cxxopts::value<std::string>()->default_value("result/latency.csv"))
     ("periodic-output", "Output file for periodical metrics", cxxopts::value<std::string>()->default_value("result/periodic_metrics.csv"))
     ("p,patterns", "Memory access patterns for each client (uniform/hot/zipfian)", cxxopts::value<std::vector<std::string>>())
+    ("zipfs", "Zipfian skew factor (e.g., 1.0 = standard Zipf)", cxxopts::value<double>()->default_value("1.0"))
+    ("cache-ring", "Enable NUMA-local cache ring buffer", cxxopts::value<bool>()->default_value("false"))
     ("r,ratio", "Memory access read/write ratio", cxxopts::value<double>()->default_value("1.0"))
     ("s,mem-sizes", "Memory size in pages for each tier", cxxopts::value<std::vector<size_t>>())
     ("sample-rate", "Periodical sampling rate", cxxopts::value<size_t>()->default_value("10"))
@@ -49,6 +51,7 @@ bool ConfigParser::_parseBasicConfig(const cxxopts::ParseResult& result)
   periodic_metric_output_file_ = result["periodic-output"].as<std::string>();
   rw_ratio_ = result["ratio"].as<double>();
   sample_rate_ = result["sample-rate"].as<size_t>();
+  use_cache_ring_ = result["cache-ring"].as<bool>();
 
   server_memory_config_.num_tiers = result["num-tiers"].as<size_t>();
   if (server_memory_config_.num_tiers < 2 || server_memory_config_.num_tiers > 3)
@@ -143,6 +146,7 @@ bool ConfigParser::_parseClientConfigs(const cxxopts::ParseResult& result) {
       LOG_ERROR("Invalid pattern type: " << patterns[i]);
       return false;
     }
+    config.zipf_s = result["zipfs"].as<double>();
 
     client_configs_.push_back(config);
   }

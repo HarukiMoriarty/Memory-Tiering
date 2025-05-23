@@ -28,6 +28,7 @@ public:
   const std::string& getPeriodicMetricFile() const { return periodic_metric_output_file_; }
   const double& getRwRatio() const { return rw_ratio_; }
   const size_t& getSampleRate() const { return sample_rate_; }
+  const bool getUseCacheRing() const { return use_cache_ring_; }
 
   bool isHelpRequested() const { return help_requested_; }
 
@@ -52,6 +53,7 @@ private:
   std::vector<ClientConfig> client_configs_;
   ServerMemoryConfig server_memory_config_;
   PolicyConfig policy_config_;
+  bool use_cache_ring_;
 
   std::string cdf_output_file_;
   std::string periodic_metric_output_file_;

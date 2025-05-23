@@ -76,6 +76,7 @@ struct ClientConfig
 {
   AccessPattern pattern;
   std::vector<size_t> tier_sizes;
+  double zipf_s;
 };
 
 /**
